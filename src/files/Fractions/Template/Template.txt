@@ -1,0 +1,1 @@
+<celéjménofrakce>;<FrakcePopis>;<Frakčníroomka>;<RoleVelitele>;<Rolezástupce>;<Frakčnírole>;<Penízefrakce>;<frakčníwarny>;<DatumVzniku>

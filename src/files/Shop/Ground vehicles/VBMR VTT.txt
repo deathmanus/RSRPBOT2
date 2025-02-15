@@ -1,0 +1,1 @@
+VBMR VTT[5000];Camo:"NATO scheme[0], Winter[0], Desert[0]";Config:"Stock[0], Heavy[2500]";Camonet:"None[0], Camonet[10]";

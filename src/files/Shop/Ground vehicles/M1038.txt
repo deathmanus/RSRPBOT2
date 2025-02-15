@@ -1,0 +1,1 @@
+M1038[5000];Camo:"FS 34094 (Green)[0], Alpine[0], FS 33531 (Sand)[0], NATO scheme[0]";Config:"Stock[0], Canopy-Transport[0], Canopy-Cargo[0], Open-Cargo[0], Armored-Up[0], Open-Transport[0], No Door-Transport[0]";Detail:"Kit A[0], Kit B[0], Kit C[0], Kit D[0], Kit E[0]";Back:"M6 pedestral mount (M2A1)[2000], M6 pedestral mount (M240B)[2000]";

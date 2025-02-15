@@ -1,0 +1,1 @@
+UH-60V Black Hawk[5000];Camo:"Aircraft Green[0]";Config:"Stock[0],FRIES bar[500]";GunRight:"No weapon[0], M240H[2000]";GunLeft:"No weapon[0], M240H[2000]";

@@ -1,0 +1,1 @@
+MH-6 Little Bird[1000];Camo:"Black[0]";Config:"Stock[0]";

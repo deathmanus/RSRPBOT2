@@ -1,0 +1,1 @@
+CH-47D Chinook[5000];Camo:"Aircraft Green[0],Woodland Desert Sage[0]";Config:"Stock[0]";GunRight:"No weapon[0],M240H[2000]";GunLeft:"No weapon[0],M240H[2000]";

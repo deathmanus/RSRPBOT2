@@ -1,0 +1,1 @@
+Tigr-M RWS[5000];Camo:"Protective Green[0],Protective Woodlant mix[250]";Config:"STS[0],AMN upgrade[0]";Extra:"N/A[0], Assault kit[350], Communications kit[450], Communications + assault Kit[850]";Roof:"No weapon[0], Arbalet-DM[4500]";Bumper:"N/A[0], Bumper[100], Bumper + support[100]";
