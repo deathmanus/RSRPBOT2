@@ -254,51 +254,166 @@ module.exports = {
                         });
                     }
                     else if (i.customId.startsWith('select-submod-')) {
-                        const [, modIndex, subModName] = i.customId.split('-');
+                        const parts = i.customId.split('-');
+                        const modIndex = parseInt(parts[2], 10);  // Changed from parts[1]
+                        const subModName = parts[3];  // Changed from parts[2]
                         const [subMod, optName, optPrice] = i.values[0].split(':');
-
+                    
+                        logShop('Sub-Modification Attempt', {
+                            modIndex,
+                            subModName,
+                            subMod,
+                            optName,
+                            optPrice,
+                            currentMods: selectedMods
+                        });
+                    
                         const itemPath = path.join(shopDir, selectedSection, `${selectedItem}.json`);
                         const itemData = JSON.parse(fs.readFileSync(itemPath, 'utf8'));
                         const { name, basePrice, modifications } = itemData;
-
-                        // Update sub-selection
-                        if (!selectedMods[modIndex].subSelections) {
-                            selectedMods[modIndex].subSelections = {};
+                    
+                        // Validate modIndex
+                        if (typeof modIndex !== 'number' || !selectedMods[modIndex]) {
+                            logShop('Error', {
+                                message: 'Invalid modification index',
+                                modIndex,
+                                selectedMods
+                            });
+                            throw new Error('Invalid modification index');
                         }
-
+                    
+                        // Get main modification details
                         const mainModName = selectedMods[modIndex].modName;
                         const mainOptName = selectedMods[modIndex].selected.split(':')[1];
-                        const mainOpt = modifications[mainModName].find(opt => opt.name === mainOptName);
-                        const subOpt = mainOpt.subOptions[subMod].find(opt => opt.name === optName);
-
+                        const mainMod = modifications[mainModName];
+                        const selectedMainOpt = mainMod.find(opt => opt.name === mainOptName);
+                    
+                        // Validate sub-modification exists
+                        if (!selectedMainOpt?.subOptions?.[subMod]) {
+                            logShop('Error', {
+                                message: 'Invalid sub-modification',
+                                mainModName,
+                                mainOptName,
+                                subMod,
+                                availableSubMods: selectedMainOpt?.subOptions
+                            });
+                            throw new Error('Invalid sub-modification configuration');
+                        }
+                    
+                        // Find the selected sub-option
+                        const subOpt = selectedMainOpt.subOptions[subMod].find(opt => opt.name === optName);
+                        if (!subOpt) {
+                            logShop('Error', {
+                                message: 'Sub-option not found',
+                                subMod,
+                                optName,
+                                availableOptions: selectedMainOpt.subOptions[subMod]
+                            });
+                            throw new Error('Sub-option not found');
+                        }
+                    
+                        // Update the sub-selection
                         selectedMods[modIndex].subSelections[subMod] = {
                             name: optName,
-                            price: subOpt.price || 0
+                            price: Number(subOpt.price) || 0
                         };
-
+                    
                         logShop('Sub-Modification Selected', {
                             modIndex,
-                            subModName,
+                            mainMod: mainModName,
+                            subModName: subMod,
                             optName,
-                            price: subOpt.price
+                            price: subOpt.price,
+                            updatedMod: selectedMods[modIndex]
                         });
-
+                    
                         const modRows = createModificationRows(modifications, selectedMods);
                         const totalPrice = calculateTotalPrice(basePrice, selectedMods);
                         const itemEmbed = createItemEmbed(name, basePrice, totalPrice, selectedMods);
-
+                    
                         await i.editReply({
                             embeds: [itemEmbed],
                             components: modRows
                         });
                     }
-                    // ... rest of your code (buy-item handler, etc.)
+                    else if (i.customId === 'buy-item') {
+                        try {
+                            const itemPath = path.join(shopDir, selectedSection, `${selectedItem}.json`);
+                            const itemData = JSON.parse(fs.readFileSync(itemPath, 'utf8'));
+                            const { name, basePrice } = itemData;
+
+                            let totalPrice = Number(basePrice);
+                            const selectedOptions = selectedMods.map(mod => {
+                                const modInfo = [];
+                                if (mod?.selected) {
+                                    const [modName, optName, optPrice] = mod.selected.split(':');
+                                    totalPrice += Number(optPrice) || 0;
+                                    modInfo.push(`${modName}: ${optName}`);
+
+                                    if (mod.subSelections) {
+                                        Object.entries(mod.subSelections).forEach(([subName, subOpt]) => {
+                                            totalPrice += Number(subOpt.price) || 0;
+                                            modInfo.push(`  ${subName}: ${subOpt.name}`);
+                                        });
+                                    }
+                                }
+                                return modInfo.join('\n');
+                            }).filter(Boolean);
+
+                            logShop('Purchase Completed', {
+                                item: selectedItem,
+                                section: selectedSection,
+                                totalPrice,
+                                selectedOptions,
+                                buyer: interaction.user.tag
+                            });
+
+                            const purchaseEmbed = new EmbedBuilder()
+                                .setColor(0x00FF00)
+                                .setTitle('🛍️ Nový nákup')
+                                .setDescription(`**${interaction.user.tag}** si koupil/a:`)
+                                .addFields(
+                                    { name: 'Položka', value: name, inline: true },
+                                    { name: 'Sekce', value: selectedSection, inline: true },
+                                    { name: 'Celková cena', value: `${totalPrice} $`, inline: true },
+                                    { name: 'Vybrané možnosti', value: selectedOptions.length > 0 ? selectedOptions.join('\n') : 'Žádné možnosti' }
+                                )
+                                .setTimestamp();
+
+                            await interaction.channel.send({ embeds: [purchaseEmbed] });
+
+                            const finalEmbed = new EmbedBuilder()
+                                .setColor(0x808080)
+                                .setTitle('Nákup dokončen')
+                                .setDescription('Pro nový nákup použijte příkaz znovu.');
+
+                            await i.editReply({
+                                embeds: [finalEmbed],
+                                components: []
+                            });
+
+                            collector.stop('purchase');
+                        } catch (error) {
+                            console.error('Error in buy-item:', error);
+                            logShop('Purchase Error', {
+                                error: error.message,
+                                stack: error.stack
+                            });
+
+                            await i.editReply({
+                                content: '❌ Chyba při zpracování nákupu.',
+                                components: [],
+                                embeds: []
+                            });
+                        }
+                    }
                 } catch (error) {
                     console.error('Error in interaction:', error);
                     logShop('Interaction Error', {
                         error: error.message,
                         stack: error.stack
                     });
+
                     await i.editReply({
                         content: '❌ Nastala chyba při zpracování vaší volby.',
                         components: [],
@@ -308,6 +423,33 @@ module.exports = {
             });
 
             // ... rest of your code (collector end handler, etc.)
+            collector.on('end', async (collected, reason) => {
+                logShop('Collector Ended', {
+                    reason,
+                    interactionsCollected: collected.size
+                });
+
+                if (reason === 'time') {
+                    try {
+                        const timeoutEmbed = new EmbedBuilder()
+                            .setColor(0x808080)
+                            .setTitle('Časový limit vypršel')
+                            .setDescription('Pro nový nákup použijte příkaz znovu.');
+
+                        await interaction.editReply({
+                            embeds: [timeoutEmbed],
+                            components: []
+                        }).catch(() => {});
+                    } catch (error) {
+                        console.error('Error in collector end:', error);
+                        logShop('Timeout Error', {
+                            error: error.message,
+                            stack: error.stack
+                        });
+                    }
+                }
+            });
+
         } catch (error) {
             console.error('Error in shop command:', error);
             logShop('Command Error', {
