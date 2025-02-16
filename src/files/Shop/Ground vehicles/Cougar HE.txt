@@ -1,1 +1,0 @@
-Cougar HE[5000];Camo:"Aircraft Green[0],Sand[0]";Config:"Stock[0]";Roof:"HMMWV weapon station (hatch cover)[200], HMMWV weapon station (M2A1)[200], HMMWV weapon station (M240B)[200],O-GPK (M240B)[200],O-GPK (M240B with overhead protection)[200],O-GPK (M2A1)[200], O-GPK (M2A1 with overhead protection)[200]";Detail:"Stock,AN/VLQ-12 CREW Duke,Patrol";

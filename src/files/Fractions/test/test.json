@@ -1,0 +1,11 @@
+{
+  "nazev": "test",
+  "popis": "test",
+  "roomId": "1340703251095490703",
+  "leaderRoleId": "1340703248113209444",
+  "deputyRoleId": "1340703244984389703",
+  "fractionRoleId": "1340703237371596810",
+  "money": 0,
+  "warns": 0,
+  "creationDate": "2025-02-16"
+}

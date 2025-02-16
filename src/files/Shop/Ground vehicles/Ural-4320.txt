@@ -1,1 +1,0 @@
-Ural-4320[5000];Camo:"Protective Green[0]";Config:"Stock[0], Cargo[0]";

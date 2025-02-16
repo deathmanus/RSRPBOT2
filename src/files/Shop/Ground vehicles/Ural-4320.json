@@ -1,0 +1,13 @@
+{
+    "name": "Ural-4320",
+    "basePrice": 5000,
+    "modifications": {
+        "Camo": [
+            { "name": "Protective Green", "price": 0 }
+        ],
+        "Config": [
+            { "name": "Stock", "price": 0 },
+            { "name": "Cargo", "price": 0 }
+        ]
+    }
+}

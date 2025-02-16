@@ -1,1 +1,0 @@
-4x4[5000];Camo:"FS 34094 (Green)[0], FS 33531 (Sand)[0]";Config:"Light[0], Heavy[1000]";

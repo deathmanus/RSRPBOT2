@@ -1,1 +1,0 @@
-M1126 ICV[5000];Camo:"FS 34094 (Green)[0], Alpine[10], NATO scheme[0]";Config:"N/A[0], Slat armor cage[0]";Roof:"N/A[0], M153 CROWS II (M2A1)[5900]";Extra:"N/A[0], CIP + AN/VLQ-12 CREW Duke[0]";Engine:"N/A[0], Engine cover[0]";

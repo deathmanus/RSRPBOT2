@@ -1,0 +1,31 @@
+{
+    "name": "M1083 FMTV",
+    "basePrice": 5000,
+    "modifications": {
+        "Camo": [
+            { "name": "FS 34094 (Green)", "price": 0 },
+            { "name": "Alpine", "price": 0 },
+            { "name": "FS 33531 (Sand)", "price": 0 },
+            { "name": "NATO scheme", "price": 0 }
+        ],
+        "Config": [
+            { "name": "M1083A1P2", "price": 0 },
+            { "name": "M1083A1P2 (cargo)", "price": 100 },
+            { "name": "M1083A1P2-B (cargo)", "price": 2500 },
+            { "name": "M1083A1P2-B", "price": 2500 }
+        ],
+        "Roof": [
+            { "name": "HMMWV weapon station (hatch cover)", "price": 0 },
+            { "name": "HMMWV weapon station (M2A1)", "price": 2400 },
+            { "name": "HMMWV weapon station (M240B)", "price": 1000 },
+            { "name": "O-GPK (M240B)", "price": 2500 },
+            { "name": "O-GPK (M240B with overhead protection)", "price": 3000 },
+            { "name": "O-GPK (M2A1)", "price": 3000 },
+            { "name": "O-GPK (M2A1 with overhead protection)", "price": 3500 }
+        ],
+        "Canopy": [
+            { "name": "N/A", "price": 0 },
+            { "name": "FMTV cargo cover kit", "price": 10 }
+        ]
+    }
+}

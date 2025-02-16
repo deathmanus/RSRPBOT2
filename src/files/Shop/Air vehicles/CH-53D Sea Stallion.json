@@ -1,0 +1,20 @@
+{
+    "name": "CH-53D Sea Stallion",
+    "basePrice": 5000,
+    "modifications": {
+        "Camo": [
+            { "name": "Light Gull Gray", "price": 0 }
+        ],
+        "Config": [
+            { "name": "Stock", "price": 0 }
+        ],
+        "GunRight": [
+            { "name": "No weapon", "price": 0 },
+            { "name": "GAU-21", "price": 2000 }
+        ],
+        "GunLeft": [
+            { "name": "No weapon", "price": 0 },
+            { "name": "GAU-21", "price": 2000 }
+        ]
+    }
+}

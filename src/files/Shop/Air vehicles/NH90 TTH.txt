@@ -1,1 +1,0 @@
-NH90 TTH[5000];Camo:"NATO green[0],Caïman[0],Bundeswehr[0]",Config:"Stock[0],FRIES bar[500], Armed[0]";GunRight:"No weapon[0], M3M[3000]";GunLeft:"No weapon[0], M3M[3000]";

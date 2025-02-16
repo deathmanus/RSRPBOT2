@@ -1,0 +1,23 @@
+{
+    "name": "VAB VTT",
+    "basePrice": 5000,
+    "modifications": {
+        "Camo": [
+            { "name": "NATO scheme", "price": 0 },
+            { "name": "Winter", "price": 10 },
+            { "name": "Desert", "price": 0 }
+        ],
+        "Config": [
+            { "name": "Stock", "price": 0 }
+        ],
+        "Camonet": [
+            { "name": "N/A", "price": 0 },
+            { "name": "Camonet", "price": 10 }
+        ],
+        "Roof": [
+            { "name": "Hatch", "price": 0 },
+            { "name": "M240B", "price": 1000 },
+            { "name": "M2", "price": 1400 }
+        ]
+    }
+}

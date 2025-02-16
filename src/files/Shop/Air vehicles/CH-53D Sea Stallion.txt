@@ -1,1 +1,0 @@
-CH-53D Sea Stallion[5000];Camo:"Light Gull Gray[0]";Config:"Stock[0]";GunRight:"No weapon[0],GAU-21[2000]";GunLeft:"No weapon[0],GAU-21[2000]";
