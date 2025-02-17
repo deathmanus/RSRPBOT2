@@ -1,11 +1,11 @@
 {
   "nazev": "test",
   "popis": "test",
-  "roomId": "1340703251095490703",
-  "leaderRoleId": "1340703248113209444",
-  "deputyRoleId": "1340703244984389703",
-  "fractionRoleId": "1340703237371596810",
-  "money": 0,
+  "roomId": "1341129627644596316",
+  "leaderRoleId": "1341129624184291369",
+  "deputyRoleId": "1341129621130842112",
+  "fractionRoleId": "1341129617926389830",
+  "money": 50000,
   "warns": 0,
-  "creationDate": "2025-02-16"
+  "creationDate": "2025-02-17"
 }

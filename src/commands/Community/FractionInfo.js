@@ -2,6 +2,32 @@ const { SlashCommandBuilder, ActionRowBuilder, StringSelectMenuBuilder, EmbedBui
 const fs = require('fs');
 const path = require('path');
 
+function countItemsInDirectory(dirPath) {
+    if (!fs.existsSync(dirPath)) return 0;
+    return fs.readdirSync(dirPath).filter(file => file.endsWith('.json')).length;
+}
+
+// First, modify the item counting function to return more details
+function getInventoryDetails(dirPath) {
+    if (!fs.existsSync(dirPath)) return { count: 0, items: [] };
+    
+    const items = fs.readdirSync(dirPath)
+        .filter(file => file.endsWith('.json'))
+        .map(file => {
+            const itemData = JSON.parse(fs.readFileSync(path.join(dirPath, file)));
+            return {
+                name: itemData.name,
+                id: itemData.id,
+                modifications: itemData.selectedMods || []
+            };
+        });
+
+    return {
+        count: items.length,
+        items: items
+    };
+}
+
 let activeCollectors = new Map(); // Uložíme collectory pro každého uživatele
 
 module.exports = {
@@ -78,6 +104,51 @@ module.exports = {
                     const diffTime = Math.abs(now - creationDateObj);
                     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
+                    // Get inventory details
+                    const categories = {
+                        'Air vehicles': path.join(fractionsDir, selectedFraction, 'Air vehicles'),
+                        'Ground vehicles': path.join(fractionsDir, selectedFraction, 'Ground vehicles'),
+                        'Equipment': path.join(fractionsDir, selectedFraction, 'Equipment'),
+                        'Resources': path.join(fractionsDir, selectedFraction, 'Resources')
+                    };
+
+                    let inventoryDetails = '';
+                    let totalItems = 0;
+                    const inventoryFields = [];
+
+                    for (const [category, categoryPath] of Object.entries(categories)) {
+                        const inventory = getInventoryDetails(categoryPath);
+                        totalItems += inventory.count;
+
+                        if (inventory.count > 0) {
+                            const itemsList = inventory.items.map(item => {
+                                let itemText = item.name;
+                                if (item.modifications && item.modifications.length > 0) {
+                                    const mods = item.modifications
+                                        .map(mod => {
+                                            let modText = mod.selected.split(':')[1];
+                                            if (mod.subSelections && Object.keys(mod.subSelections).length > 0) {
+                                                modText += ': ' + Object.entries(mod.subSelections)
+                                                    .map(([name, opt]) => `${opt.name}`)
+                                                    .join(', ');
+                                            }
+                                            return modText;
+                                        })
+                                        .join(' | ');
+                                    itemText += ` (${mods})`;
+                                }
+                                return itemText;
+                            });
+
+                            inventoryFields.push({
+                                name: `${category} (${inventory.count})`,
+                                value: itemsList.join('\n'),
+                                inline: false
+                            });
+                        }
+                    }
+
+                    // Modify the fractionEmbed creation
                     const fractionEmbed = new EmbedBuilder()
                         .setColor(0x00FF00)
                         .setTitle(nazev)
@@ -92,6 +163,26 @@ module.exports = {
                             { name: 'Frakční warny', value: warns.toString(), inline: true },
                             { name: 'Doba existence', value: `${diffDays} dní`, inline: true }
                         );
+
+                    // Add total items count if any items exist
+                    if (totalItems > 0) {
+                        fractionEmbed.addFields({
+                            name: 'Celkový počet předmětů',
+                            value: `${totalItems}`,
+                            inline: false
+                        });
+                    }
+
+                    // Add inventory fields
+                    if (inventoryFields.length > 0) {
+                        fractionEmbed.addFields(...inventoryFields);
+                    } else {
+                        fractionEmbed.addFields({
+                            name: 'Inventář',
+                            value: 'Žádné předměty',
+                            inline: false
+                        });
+                    }
 
                     await i.update({ embeds: [fractionEmbed], components: [] });
 

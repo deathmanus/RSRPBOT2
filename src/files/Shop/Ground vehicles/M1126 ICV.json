@@ -18,10 +18,6 @@
         "Extra": [
             { "name": "N/A", "price": 0 },
             { "name": "CIP + AN/VLQ-12 CREW Duke", "price": 0 }
-        ],
-        "Engine": [
-            { "name": "N/A", "price": 0 },
-            { "name": "Engine cover", "price": 0 }
         ]
     }
 }

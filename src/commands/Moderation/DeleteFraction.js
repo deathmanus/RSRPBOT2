@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, ActionRowBuilder, StringSelectMenuBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder, ActionRowBuilder, StringSelectMenuBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, AttachmentBuilder } = require('discord.js');
 const fs = require('fs');
 const path = require('path');
 
@@ -70,6 +70,72 @@ module.exports = {
 
                             if (btn.customId === 'yes-delete') {
                                 const guild = interaction.guild;
+                                const backupChannel = guild.channels.cache.get('1213225816201240587');
+
+                                if (!backupChannel) {
+                                    console.error('Backup channel not found');
+                                    return await btn.editReply({
+                                        content: '❌ Chyba: Záložní kanál nenalezen',
+                                        components: [],
+                                        ephemeral: true
+                                    });
+                                }
+
+                                // Create backup of all files
+                                const fractionPath = path.join(fractionsDir, selectedFraction);
+
+                                // Function to recursively get all files
+                                const getAllFiles = (dirPath, arrayOfFiles = []) => {
+                                    const files = fs.readdirSync(dirPath);
+
+                                    files.forEach(file => {
+                                        const fullPath = path.join(dirPath, file);
+                                        if (fs.statSync(fullPath).isDirectory()) {
+                                            arrayOfFiles = getAllFiles(fullPath, arrayOfFiles);
+                                        } else {
+                                            arrayOfFiles.push({
+                                                path: fullPath,
+                                                relativePath: path.relative(fractionPath, fullPath)
+                                            });
+                                        }
+                                    });
+
+                                    return arrayOfFiles;
+                                };
+
+                                const allFiles = getAllFiles(fractionPath);
+
+                                // Send backup message
+                                const backupEmbed = new EmbedBuilder()
+                                    .setColor(0xFF0000)
+                                    .setTitle(`📤 Záloha frakce ${selectedFraction}`)
+                                    .setDescription(`Záloha souborů před odstraněním frakce **${selectedFraction}**`)
+                                    .setTimestamp();
+
+                                await backupChannel.send({ embeds: [backupEmbed] });
+
+                                // Send all files
+                                for (const file of allFiles) {
+                                    const fileContent = fs.readFileSync(file.path);
+                                    const attachment = new AttachmentBuilder(fileContent, {
+                                        name: file.relativePath
+                                    });
+                                    await backupChannel.send({
+                                        content: `📁 ${file.relativePath}`,
+                                        files: [attachment]
+                                    });
+                                }
+
+                                // Send completion message
+                                await backupChannel.send({
+                                    embeds: [new EmbedBuilder()
+                                        .setColor(0xFF0000)
+                                        .setTitle(`📥 Záloha dokončena`)
+                                        .setDescription(`Celkem zálohováno: ${allFiles.length} souborů`)
+                                        .setTimestamp()]
+                                });
+
+                                // Delete fraction resources
                                 if (roomId) {
                                     const channel = guild.channels.cache.get(roomId);
                                     if (channel) await channel.delete().catch(console.error);
@@ -87,7 +153,7 @@ module.exports = {
                                     if (fractionRole) await fractionRole.delete().catch(console.error);
                                 }
 
-                                const fractionPath = path.join(fractionsDir, selectedFraction);
+                                // Delete fraction directory
                                 fs.rmSync(fractionPath, { recursive: true, force: true });
 
                                 const fractionEmbed = new EmbedBuilder()
@@ -103,6 +169,7 @@ module.exports = {
                             confirmCollector.stop();
                         } catch (error) {
                             console.error('Chyba v potvrzení:', error);
+                            await interaction.editReply({ content: '❌ Nastala chyba při odstraňování frakce.', components: [], ephemeral: true });
                         }
                     });
 
@@ -113,6 +180,7 @@ module.exports = {
                     });
                 } catch (error) {
                     console.error('Chyba při výběru frakce:', error);
+                    await interaction.editReply({ content: '❌ Nastala chyba při zpracování výběru frakce.', components: [], ephemeral: true });
                 }
             });
 
@@ -123,6 +191,7 @@ module.exports = {
             });
         } catch (error) {
             console.error('Chyba v příkazu deletefraction:', error);
+            await interaction.editReply({ content: '❌ Nastala chyba při zpracování příkazu.', components: [], ephemeral: true });
         }
     }
 };

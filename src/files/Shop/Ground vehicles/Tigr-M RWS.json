@@ -19,11 +19,6 @@
         "Roof": [
             { "name": "No weapon", "price": 0 },
             { "name": "Arbalet-DM", "price": 4500 }
-        ],
-        "Bumper": [
-            { "name": "N/A", "price": 0 },
-            { "name": "Bumper", "price": 100 },
-            { "name": "Bumper + support", "price": 100 }
         ]
     }
 }
