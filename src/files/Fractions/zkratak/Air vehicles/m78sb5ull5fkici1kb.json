@@ -1,0 +1,20 @@
+{
+  "id": "m78sb5ull5fkici1kb",
+  "name": "MH-6 Little Bird",
+  "basePrice": 1000,
+  "totalPrice": 1000,
+  "purchaseDate": "2025-02-17T08:19:25.917Z",
+  "buyer": "death_man",
+  "selectedMods": [
+    {
+      "modName": "Camo",
+      "selected": "Camo:Black:0",
+      "subSelections": {}
+    },
+    {
+      "modName": "Config",
+      "selected": "Config:Stock:0",
+      "subSelections": {}
+    }
+  ]
+}

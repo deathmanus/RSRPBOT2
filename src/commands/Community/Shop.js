@@ -338,68 +338,195 @@ module.exports = {
                     }
                     else if (i.customId === 'buy-item') {
                         try {
+                            // Kontrola členství ve frakci
+                            const member = interaction.member;
+                            const fractionRole = member.roles.cache.find(role => 
+                                fs.existsSync(path.join(__dirname, '../../files/Fractions', role.name)));
+                            
+                            if (!fractionRole) {
+                                return await i.editReply({
+                                    content: '❌ Nejste členem žádné frakce.',
+                                    components: [],
+                                    embeds: []
+                                });
+                            }
+                    
+                            const fractionPath = path.join(__dirname, '../../files/Fractions', fractionRole.name);
+                            const fractionData = JSON.parse(fs.readFileSync(path.join(fractionPath, `${fractionRole.name}.json`)));
+                    
                             const itemPath = path.join(shopDir, selectedSection, `${selectedItem}.json`);
                             const itemData = JSON.parse(fs.readFileSync(itemPath, 'utf8'));
                             const { name, basePrice } = itemData;
-
-                            let totalPrice = Number(basePrice);
+                    
+                            let totalPrice = calculateTotalPrice(basePrice, selectedMods);
+                    
+                            // Kontrola financí frakce
+                            if (fractionData.money < totalPrice) {
+                                return await i.editReply({
+                                    content: `❌ Vaše frakce nemá dostatek peněz. Potřebujete: ${totalPrice}$, Máte: ${fractionData.money}$`,
+                                    components: [],
+                                    embeds: []
+                                });
+                            }
+                    
                             const selectedOptions = selectedMods.map(mod => {
                                 const modInfo = [];
                                 if (mod?.selected) {
-                                    const [modName, optName, optPrice] = mod.selected.split(':');
-                                    totalPrice += Number(optPrice) || 0;
+                                    const [modName, optName] = mod.selected.split(':');
                                     modInfo.push(`${modName}: ${optName}`);
-
+                    
                                     if (mod.subSelections) {
                                         Object.entries(mod.subSelections).forEach(([subName, subOpt]) => {
-                                            totalPrice += Number(subOpt.price) || 0;
                                             modInfo.push(`  ${subName}: ${subOpt.name}`);
                                         });
                                     }
                                 }
                                 return modInfo.join('\n');
                             }).filter(Boolean);
-
-                            logShop('Purchase Completed', {
-                                item: selectedItem,
-                                section: selectedSection,
-                                totalPrice,
-                                selectedOptions,
-                                buyer: interaction.user.tag
-                            });
-
-                            const purchaseEmbed = new EmbedBuilder()
-                                .setColor(0x00FF00)
-                                .setTitle('🛍️ Nový nákup')
-                                .setDescription(`**${interaction.user.tag}** si koupil/a:`)
+                    
+                            // Vytvoření potvrzovacího embedu
+                            const confirmEmbed = new EmbedBuilder()
+                                .setColor(0xFFAA00)
+                                .setTitle('🛍️ Potvrzení nákupu')
+                                .setDescription(`**Opravdu chcete koupit tento předmět?**`)
                                 .addFields(
                                     { name: 'Položka', value: name, inline: true },
                                     { name: 'Sekce', value: selectedSection, inline: true },
                                     { name: 'Celková cena', value: `${totalPrice} $`, inline: true },
-                                    { name: 'Vybrané možnosti', value: selectedOptions.length > 0 ? selectedOptions.join('\n') : 'Žádné možnosti' }
-                                )
-                                .setTimestamp();
-
-                            await interaction.channel.send({ embeds: [purchaseEmbed] });
-
-                            const finalEmbed = new EmbedBuilder()
-                                .setColor(0x808080)
-                                .setTitle('Nákup dokončen')
-                                .setDescription('Pro nový nákup použijte příkaz znovu.');
-
+                                    { name: 'Vybrané možnosti', value: selectedOptions.length > 0 ? selectedOptions.join('\n') : 'Žádné možnosti' },
+                                    { name: 'Stav účtu frakce', value: `Současný: ${fractionData.money}$\nPo nákupu: ${fractionData.money - totalPrice}$` }
+                                );
+                    
+                            const confirmRow = new ActionRowBuilder()
+                                .addComponents(
+                                    new ButtonBuilder()
+                                        .setCustomId('confirm-purchase')
+                                        .setLabel('Potvrdit')
+                                        .setStyle(ButtonStyle.Success),
+                                    new ButtonBuilder()
+                                        .setCustomId('cancel-purchase')
+                                        .setLabel('Zrušit')
+                                        .setStyle(ButtonStyle.Danger)
+                                );
+                    
                             await i.editReply({
-                                embeds: [finalEmbed],
-                                components: []
+                                embeds: [confirmEmbed],
+                                components: [confirmRow]
                             });
-
-                            collector.stop('purchase');
+                    
+                            // Collector pro potvrzení
+                            const confirmCollector = i.message.createMessageComponentCollector({
+                                filter: response => response.user.id === interaction.user.id,
+                                time: 30000,
+                                max: 1
+                            });
+                    
+                            confirmCollector.on('collect', async confirm => {
+                                if (confirm.customId === 'confirm-purchase') {
+                                    try {
+                                        // Generování unikátního ID
+                                        const uniqueId = Date.now().toString(36) + Math.random().toString(36).substr(2);
+                                        
+                                        // Vytvoření složky sekce ve frakci (pokud neexistuje)
+                                        const fractionSectionPath = path.join(fractionPath, selectedSection);
+                                        if (!fs.existsSync(fractionSectionPath)) {
+                                            fs.mkdirSync(fractionSectionPath, { recursive: true });
+                                        }
+                            
+                                        // Vytvoření souboru předmětu
+                                        const purchaseData = {
+                                            id: uniqueId,
+                                            name,
+                                            basePrice,
+                                            totalPrice,
+                                            purchaseDate: new Date().toISOString(),
+                                            buyer: interaction.user.tag,
+                                            selectedMods
+                                        };
+                            
+                                        fs.writeFileSync(
+                                            path.join(fractionSectionPath, `${uniqueId}.json`),
+                                            JSON.stringify(purchaseData, null, 2)
+                                        );
+                            
+                                        // Aktualizace peněz frakce
+                                        fractionData.money -= totalPrice;
+                                        fs.writeFileSync(
+                                            path.join(fractionPath, `${fractionRole.name}.json`),
+                                            JSON.stringify(fractionData, null, 2)
+                                        );
+                            
+                                        // Finální embed
+                                        const purchaseEmbed = new EmbedBuilder()
+                                            .setColor(0x00FF00)
+                                            .setTitle('✅ Nákup dokončen')
+                                            .setDescription(`**${interaction.user.tag}** zakoupil/a pro frakci **${fractionRole.name}**:`)
+                                            .addFields(
+                                                { name: 'Položka', value: name, inline: true },
+                                                { name: 'Sekce', value: selectedSection, inline: true },
+                                                { name: 'Celková cena', value: `${totalPrice} $`, inline: true },
+                                                { name: 'Vybrané možnosti', value: selectedOptions.length > 0 ? selectedOptions.join('\n') : 'Žádné možnosti' },
+                                                { name: 'Nový stav účtu', value: `${fractionData.money} $` },
+                                                { name: 'ID předmětu', value: uniqueId }
+                                            )
+                                            .setTimestamp();
+                            
+                                        // Nejdřív aktualizujeme tlačítka
+                                        await confirm.update({ 
+                                            content: '✅ Zpracovávám nákup...',
+                                            components: [],
+                                            embeds: []
+                                        });
+                            
+                                        // Pak odešleme potvrzení do kanálu
+                                        await interaction.channel.send({ embeds: [purchaseEmbed] });
+                            
+                                        logShop('Purchase Completed', {
+                                            itemId: uniqueId,
+                                            buyer: interaction.user.tag,
+                                            fraction: fractionRole.name,
+                                            totalPrice
+                                        });
+                            
+                                    } catch (error) {
+                                        console.error('Purchase confirmation error:', error);
+                                        await confirm.update({
+                                            content: '❌ Nastala chyba při zpracování nákupu',
+                                            components: [],
+                                            embeds: []
+                                        }).catch(console.error);
+                                    }
+                                } else {
+                                    // Zrušení nákupu
+                                    await confirm.update({
+                                        content: '❌ Nákup byl zrušen',
+                                        components: [],
+                                        embeds: []
+                                    }).catch(console.error);
+                                }
+                            });
+                            
+                            confirmCollector.on('end', async (collected, reason) => {
+                                if (reason === 'time') {
+                                    try {
+                                        await i.editReply({
+                                            content: '⌛ Vypršel čas na potvrzení nákupu',
+                                            components: [],
+                                            embeds: []
+                                        });
+                                    } catch (error) {
+                                        console.error('Timeout handler error:', error);
+                                    }
+                                }
+                            });
+                    
                         } catch (error) {
                             console.error('Error in buy-item:', error);
                             logShop('Purchase Error', {
                                 error: error.message,
                                 stack: error.stack
                             });
-
+                    
                             await i.editReply({
                                 content: '❌ Chyba při zpracování nákupu.',
                                 components: [],

@@ -95,20 +95,7 @@ module.exports = {
 
         const attachment = new AttachmentBuilder(path.join(fractionDir, `${zkratka}.json`));
 
-        // Create subdirectories based on ../../../files/Shop/ structure
-        const shopDir = path.join(__dirname, '../../files/Shop');
-        if (!fs.existsSync(shopDir)) {
-            console.error(`Directory ${shopDir} does not exist.`);
-            return;
-        }
-
-        const subDirs = fs.readdirSync(shopDir, { withFileTypes: true })
-            .filter(dirent => dirent.isDirectory())
-            .map(dirent => dirent.name);
-
-        subDirs.forEach(subDir => {
-            fs.mkdirSync(path.join(fractionDir, subDir), { recursive: true });
-        });
+       
         
         await interaction.editReply({ content: `✅ Kanál ${room} byl vytvořen! Role ${leaderRole}, ${deputyRole}, ${fractionRole} taky.`, files: [attachment] });
     }
