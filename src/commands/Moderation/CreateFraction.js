@@ -83,7 +83,7 @@ module.exports = {
         const fractionData = {
             nazev,
             popis,
-            roomId: room.id,
+            roomId: room.id,    
             leaderRoleId: leaderRole.id,
             deputyRoleId: deputyRole.id,
             fractionRoleId: fractionRole.id,

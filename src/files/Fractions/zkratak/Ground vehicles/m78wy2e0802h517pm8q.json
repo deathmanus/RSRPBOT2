@@ -1,0 +1,30 @@
+{
+  "id": "m78wy2e0802h517pm8q",
+  "name": "M1083 FMTV",
+  "basePrice": 5000,
+  "totalPrice": 8510,
+  "purchaseDate": "2025-02-17T10:29:12.985Z",
+  "buyer": "death_man",
+  "selectedMods": [
+    {
+      "modName": "Camo",
+      "selected": "Camo:FS 33531 (Sand):0",
+      "subSelections": {}
+    },
+    {
+      "modName": "Config",
+      "selected": "Config:M1083A1P2-B (cargo):2500",
+      "subSelections": {}
+    },
+    {
+      "modName": "Roof",
+      "selected": "Roof:HMMWV weapon station (M240B):1000",
+      "subSelections": {}
+    },
+    {
+      "modName": "Canopy",
+      "selected": "Canopy:FMTV cargo cover kit:10",
+      "subSelections": {}
+    }
+  ]
+}

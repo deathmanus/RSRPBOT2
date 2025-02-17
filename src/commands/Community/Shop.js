@@ -424,16 +424,16 @@ module.exports = {
                             confirmCollector.on('collect', async confirm => {
                                 if (confirm.customId === 'confirm-purchase') {
                                     try {
-                                        // Generování unikátního ID
+                                        // Generate unique ID first
                                         const uniqueId = Date.now().toString(36) + Math.random().toString(36).substr(2);
                                         
-                                        // Vytvoření složky sekce ve frakci (pokud neexistuje)
+                                        // Create fraction section folder
                                         const fractionSectionPath = path.join(fractionPath, selectedSection);
                                         if (!fs.existsSync(fractionSectionPath)) {
                                             fs.mkdirSync(fractionSectionPath, { recursive: true });
                                         }
                             
-                                        // Vytvoření souboru předmětu
+                                        // Save purchase data
                                         const purchaseData = {
                                             id: uniqueId,
                                             name,
@@ -444,19 +444,20 @@ module.exports = {
                                             selectedMods
                                         };
                             
+                                        // Write purchase file
                                         fs.writeFileSync(
                                             path.join(fractionSectionPath, `${uniqueId}.json`),
                                             JSON.stringify(purchaseData, null, 2)
                                         );
                             
-                                        // Aktualizace peněz frakce
+                                        // Update fraction money
                                         fractionData.money -= totalPrice;
                                         fs.writeFileSync(
                                             path.join(fractionPath, `${fractionRole.name}.json`),
                                             JSON.stringify(fractionData, null, 2)
                                         );
                             
-                                        // Finální embed
+                                        // Create purchase confirmation embed
                                         const purchaseEmbed = new EmbedBuilder()
                                             .setColor(0x00FF00)
                                             .setTitle('✅ Nákup dokončen')
@@ -471,14 +472,14 @@ module.exports = {
                                             )
                                             .setTimestamp();
                             
-                                        // Nejdřív aktualizujeme tlačítka
-                                        await confirm.update({ 
-                                            content: '✅ Zpracovávám nákup...',
-                                            components: [],
-                                            embeds: []
+                                        // Update original message
+                                        await i.editReply({
+                                            content: '✅ Nákup byl úspěšně dokončen',
+                                            embeds: [],
+                                            components: []
                                         });
                             
-                                        // Pak odešleme potvrzení do kanálu
+                                        // Send confirmation to channel
                                         await interaction.channel.send({ embeds: [purchaseEmbed] });
                             
                                         logShop('Purchase Completed', {
@@ -490,19 +491,33 @@ module.exports = {
                             
                                     } catch (error) {
                                         console.error('Purchase confirmation error:', error);
-                                        await confirm.update({
+                                        await i.editReply({
                                             content: '❌ Nastala chyba při zpracování nákupu',
-                                            components: [],
-                                            embeds: []
-                                        }).catch(console.error);
+                                            embeds: [],
+                                            components: []
+                                        });
                                     }
                                 } else {
-                                    // Zrušení nákupu
-                                    await confirm.update({
+                                    // Handle purchase cancellation
+                                    await i.editReply({
                                         content: '❌ Nákup byl zrušen',
-                                        components: [],
-                                        embeds: []
-                                    }).catch(console.error);
+                                        embeds: [],
+                                        components: []
+                                    });
+                                }
+                            });
+                            
+                            confirmCollector.on('end', async (collected, reason) => {
+                                if (reason === 'time' && !collected.size) {
+                                    try {
+                                        await i.editReply({
+                                            content: '⌛ Vypršel čas na potvrzení nákupu',
+                                            embeds: [],
+                                            components: []
+                                        });
+                                    } catch (error) {
+                                        console.error('Timeout handler error:', error);
+                                    }
                                 }
                             });
                             
