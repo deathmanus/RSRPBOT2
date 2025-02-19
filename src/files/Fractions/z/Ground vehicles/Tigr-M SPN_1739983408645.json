@@ -1,0 +1,28 @@
+{
+  "id": "Tigr-M SPN_1739983408645",
+  "name": "Tigr-M SPN",
+  "addedBy": "death_man",
+  "addedDate": "2025-02-19T16:43:28.645Z",
+  "selectedMods": [
+    {
+      "modName": "Camo",
+      "selected": "Camo:Protective green:0",
+      "subSelections": {}
+    },
+    {
+      "modName": "Config",
+      "selected": "Config:AMN troops upgrade:700",
+      "subSelections": {}
+    },
+    {
+      "modName": "Extra",
+      "selected": "Extra:Communications kit:450",
+      "subSelections": {}
+    },
+    {
+      "modName": "Roof",
+      "selected": "Roof:PKP + gunner protection:2500",
+      "subSelections": {}
+    }
+  ]
+}
