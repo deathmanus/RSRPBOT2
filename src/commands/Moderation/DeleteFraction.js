@@ -59,7 +59,13 @@ module.exports = {
                         .setStyle(ButtonStyle.Secondary);
 
                     const confirmRow = new ActionRowBuilder().addComponents(yesButton, noButton);
-                    const confirmationMessage = await interaction.followUp({ embeds: [confirmEmbed], components: [confirmRow], ephemeral: true });
+                    
+                    // Update original message instead of sending new one
+                    await interaction.editReply({ 
+                        embeds: [confirmEmbed], 
+                        components: [confirmRow], 
+                        ephemeral: true 
+                    });
 
                     const confirmFilter = btn => ['yes-delete', 'no-delete'].includes(btn.customId) && btn.user.id === interaction.user.id;
                     const confirmCollector = interaction.channel.createMessageComponentCollector({ filter: confirmFilter, time: 60000 });
@@ -161,15 +167,28 @@ module.exports = {
                                     .setTitle(`✅ Odstranění frakce ${selectedFraction}`)
                                     .setDescription(`Frakce **${selectedFraction}** byla úspěšně odstraněna.`);
 
-                                await interaction.editReply({ embeds: [fractionEmbed], components: [], ephemeral: true });
+                                await interaction.editReply({ 
+                                    embeds: [fractionEmbed], 
+                                    components: [], 
+                                    ephemeral: true 
+                                });
                             } else {
-                                await interaction.editReply({ content: '❌ Odstranění frakce bylo zrušeno.', components: [], ephemeral: true });
+                                await interaction.editReply({ 
+                                    content: '❌ Odstranění frakce bylo zrušeno.', 
+                                    embeds: [], 
+                                    components: [], 
+                                    ephemeral: true 
+                                });
                             }
 
                             confirmCollector.stop();
                         } catch (error) {
                             console.error('Chyba v potvrzení:', error);
-                            await interaction.editReply({ content: '❌ Nastala chyba při odstraňování frakce.', components: [], ephemeral: true });
+                            await interaction.editReply({ 
+                                content: '❌ Nastala chyba při odstraňování frakce.', 
+                                components: [], 
+                                ephemeral: true 
+                            });
                         }
                     });
 
