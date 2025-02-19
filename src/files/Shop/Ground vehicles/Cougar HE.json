@@ -1,5 +1,6 @@
 {
     "name": "Cougar HE",
+    "type": "modifiable",
     "basePrice": 5000,
     "modifications": {
         "Camo": [

@@ -1,5 +1,6 @@
 {
     "name": "M1083 FMTV",
+    "type": "modifiable",
     "basePrice": 5000,
     "modifications": {
         "Camo": [

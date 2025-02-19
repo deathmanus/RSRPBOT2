@@ -118,13 +118,7 @@ module.exports = {
                         const itemPath = path.join(shopDir, selectedSection, `${selectedItem}.json`);
                         const itemData = JSON.parse(fs.readFileSync(itemPath, 'utf8'));
                         const { name, basePrice, modifications } = itemData;
-
-                        logShop('Item Selected', {
-                            item: selectedItem,
-                            basePrice,
-                            availableModifications: Object.keys(modifications)
-                        });
-
+                    
                         // Initialize modifications with default selections
                         selectedMods = Object.entries(modifications).map(([modName, modValues]) => {
                             const defaultOption = modValues[0];
@@ -143,116 +137,51 @@ module.exports = {
                                     ) : {}
                             };
                         });
-
-                        logShop('Initial Modifications Set', { selectedMods });
-
-                        const modRows = [];
-
-                        // Create modification menus
-                        Object.entries(modifications).forEach(([modName, modValues], index) => {
-                            modRows.push(
-                                new ActionRowBuilder().addComponents(
-                                    new StringSelectMenuBuilder()
-                                        .setCustomId(`select-mod-${index}`)
-                                        .setPlaceholder(`Vyberte ${modName}`)
-                                        .addOptions(modValues.map((opt, idx) => ({
-                                            label: opt.name,
-                                            value: `${modName}:${opt.name}:${opt.price || 0}`,
-                                            default: idx === 0
-                                        })))
-                                )
-                            );
-
-                            // Add sub-option menus if available
-                            if (modValues[0].subOptions) {
-                                Object.entries(modValues[0].subOptions).forEach(([subName, subValues]) => {
-                                    modRows.push(
-                                        new ActionRowBuilder().addComponents(
-                                            new StringSelectMenuBuilder()
-                                                .setCustomId(`select-submod-${index}-${subName}`)
-                                                .setPlaceholder(`Vyberte ${subName}`)
-                                                .addOptions(subValues.map((opt, idx) => ({
-                                                    label: opt.name,
-                                                    value: `${subName}:${opt.name}:${opt.price || 0}`,
-                                                    default: idx === 0
-                                                })))
-                                        )
-                                    );
-                                });
-                            }
-                        });
-
-                        if (modRows.length < 5) {
-                            modRows.push(
-                                new ActionRowBuilder().addComponents(
-                                    new ButtonBuilder()
-                                        .setCustomId('buy-item')
-                                        .setLabel('Koupit')
-                                        .setStyle(ButtonStyle.Success)
-                                )
-                            );
-                        }
-
-                        const totalPrice = calculateTotalPrice(basePrice, selectedMods);
-
-                        logShop('Price Calculation', {
-                            basePrice,
-                            totalPrice,
-                            modifications: selectedMods
-                        });
-
-                        const itemEmbed = createItemEmbed(name, basePrice, totalPrice, selectedMods);
-
-                        await i.editReply({
-                            embeds: [itemEmbed],
-                            components: modRows
-                        });
+                    
+                        const { pages, totalModifications } = createModificationPages(modifications, selectedMods);
+                        const currentPage = 0;
+                    
+                        // Store in collector for later use
+                        collector.pages = pages;
+                        collector.currentPage = currentPage;
+                        collector.totalModifications = totalModifications;
+                    
+                        const display = updateModificationDisplay(i, itemData, selectedMods, currentPage);
+                        await i.editReply(display);
                     }
+                    // In the select-mod handler:
                     else if (i.customId.startsWith('select-mod-')) {
                         const modIndex = parseInt(i.customId.split('-')[2], 10);
                         const [modName, optName, optPrice] = i.values[0].split(':');
-
+                    
                         const itemPath = path.join(shopDir, selectedSection, `${selectedItem}.json`);
                         const itemData = JSON.parse(fs.readFileSync(itemPath, 'utf8'));
-                        const { name, basePrice, modifications } = itemData;
-
-                        const selectedModification = modifications[modName];
-                        const selectedOption = selectedModification.find(opt => opt.name === optName);
-
-                        // Update only the changed modification
+                        const { modifications } = itemData;
+                    
+                        // Update the selected modification
                         selectedMods[modIndex] = {
                             ...selectedMods[modIndex],
                             modName,
-                            selected: `${modName}:${optName}:${selectedOption.price || 0}`,
-                            subSelections: selectedOption.subOptions ?
-                                Object.fromEntries(
-                                    Object.entries(selectedOption.subOptions).map(([subName, subValues]) => [
-                                        subName,
-                                        {
-                                            name: subValues[0].name,
-                                            price: subValues[0].price || 0
-                                        }
-                                    ])
-                                ) : {}
+                            selected: `${modName}:${optName}:${optPrice}`,
+                            subSelections: {} // Reset sub-selections when changing main selection
                         };
-
-                        logShop('Modification Selected', {
-                            modIndex,
-                            modName,
-                            optName,
-                            price: selectedOption.price,
-                            subOptions: selectedOption.subOptions
-                        });
-
-                        const modRows = createModificationRows(modifications, selectedMods);
-                        const totalPrice = calculateTotalPrice(basePrice, selectedMods);
-                        const itemEmbed = createItemEmbed(name, basePrice, totalPrice, selectedMods);
-
-                        await i.editReply({
-                            embeds: [itemEmbed],
-                            components: modRows
-                        });
+                    
+                        // Get the selected option's subOptions if any
+                        const selectedModification = modifications[modName];
+                        const selectedOption = selectedModification.find(opt => opt.name === optName);
+                        if (selectedOption?.subOptions) {
+                            Object.entries(selectedOption.subOptions).forEach(([subName, subValues]) => {
+                                selectedMods[modIndex].subSelections[subName] = {
+                                    name: subValues[0].name,
+                                    price: subValues[0].price || 0
+                                };
+                            });
+                        }
+                    
+                        const display = updateModificationDisplay(i, itemData, selectedMods, collector.currentPage || 0);
+                        await i.editReply(display);
                     }
+                    // In the select-submod handler:
                     else if (i.customId.startsWith('select-submod-')) {
                         const parts = i.customId.split('-');
                         const modIndex = parseInt(parts[2], 10);  // Changed from parts[1]
@@ -327,14 +256,23 @@ module.exports = {
                             updatedMod: selectedMods[modIndex]
                         });
                     
-                        const modRows = createModificationRows(modifications, selectedMods);
-                        const totalPrice = calculateTotalPrice(basePrice, selectedMods);
-                        const itemEmbed = createItemEmbed(name, basePrice, totalPrice, selectedMods);
+                        const display = updateModificationDisplay(i, itemData, selectedMods, collector.currentPage || 0);
+                        await i.editReply(display);
+                    }
+                    // In the page navigation handlers:
+                    else if (i.customId === 'prev-page' || i.customId === 'next-page') {
+                        const direction = i.customId === 'next-page' ? 1 : -1;
+                        const itemPath = path.join(shopDir, selectedSection, `${selectedItem}.json`);
+                        const itemData = JSON.parse(fs.readFileSync(itemPath, 'utf8'));
                     
-                        await i.editReply({
-                            embeds: [itemEmbed],
-                            components: modRows
-                        });
+                        // Get current pages structure
+                        const { pages, totalModifications } = createModificationPages(itemData.modifications, selectedMods);
+                        
+                        // Update current page with bounds checking
+                        collector.currentPage = Math.max(0, Math.min(pages.length - 1, (collector.currentPage || 0) + direction));
+                    
+                        const display = updateModificationDisplay(i, itemData, selectedMods, collector.currentPage);
+                        await i.editReply(display);
                     }
                     else if (i.customId === 'buy-item') {
                         try {
@@ -694,4 +632,130 @@ function createModificationRows(modifications, selectedMods) {
     }
 
     return modRows;
+}
+
+function createNavigationRow(currentPage, totalPages) {
+    return new ActionRowBuilder()
+        .addComponents(
+            new ButtonBuilder()
+                .setCustomId('prev-page')
+                .setLabel('◀️')
+                .setStyle(ButtonStyle.Primary)
+                .setDisabled(currentPage === 0),
+            new ButtonBuilder()
+                .setCustomId('next-page')
+                .setLabel('▶️')
+                .setStyle(ButtonStyle.Primary)
+                .setDisabled(currentPage >= totalPages - 1),
+            new ButtonBuilder()
+                .setCustomId('buy-item')
+                .setLabel('Koupit')
+                .setStyle(ButtonStyle.Success)
+        );
+}
+
+function createModificationPages(modifications, selectedMods) {
+    const allRows = [];
+
+    // Collect all rows first
+    Object.entries(modifications).forEach(([modName, modValues], index) => {
+        // Add main modification
+        allRows.push(new ActionRowBuilder().addComponents(
+            new StringSelectMenuBuilder()
+                .setCustomId(`select-mod-${index}`)
+                .setPlaceholder(`Vyberte ${modName}`)
+                .addOptions(modValues.map(opt => ({
+                    label: opt.name,
+                    value: `${modName}:${opt.name}:${opt.price || 0}`,
+                    default: selectedMods[index]?.selected === `${modName}:${opt.name}:${opt.price || 0}`
+                })))
+        ));
+
+        // Add sub-selections immediately after their parent mod
+        const currentMod = selectedMods[index];
+        if (currentMod?.selected) {
+            const [selectedModName, selectedOptName] = currentMod.selected.split(':');
+            const selectedOption = modValues.find(opt => opt.name === selectedOptName);
+
+            if (selectedOption?.subOptions) {
+                Object.entries(selectedOption.subOptions).forEach(([subName, subValues]) => {
+                    allRows.push(new ActionRowBuilder().addComponents(
+                        new StringSelectMenuBuilder()
+                            .setCustomId(`select-submod-${index}-${subName}`)
+                            .setPlaceholder(`Vyberte ${subName}`)
+                            .addOptions(subValues.map(opt => ({
+                                label: opt.name,
+                                value: `${subName}:${opt.name}:${opt.price || 0}`,
+                                default: currentMod.subSelections?.[subName]?.name === opt.name
+                            })))
+                    ));
+                });
+            }
+        }
+    });
+
+    // Split into pages of 4 rows each
+    const pages = [];
+    for (let i = 0; i < allRows.length; i += 4) {
+        pages.push(allRows.slice(i, i + 4));
+    }
+
+    return {
+        pages,
+        totalModifications: allRows.length
+    };
+}
+
+// Update the updateModificationDisplay function
+function updateModificationDisplay(interaction, itemData, selectedMods, currentPage = 0) {
+    const { pages, totalModifications } = createModificationPages(itemData.modifications, selectedMods);
+    const { name, basePrice } = itemData;
+
+    // Ensure current page is valid
+    currentPage = Math.max(0, Math.min(pages.length - 1, currentPage));
+
+    const modRows = [...pages[currentPage]];
+    
+    // Always show navigation if there are multiple pages
+    if (pages.length > 1) {
+        modRows.push(
+            new ActionRowBuilder().addComponents(
+                new ButtonBuilder()
+                    .setCustomId('prev-page')
+                    .setLabel('◀️')
+                    .setStyle(ButtonStyle.Primary)
+                    .setDisabled(currentPage === 0),
+                new ButtonBuilder()
+                    .setCustomId('next-page')
+                    .setLabel('▶️')
+                    .setStyle(ButtonStyle.Primary)
+                    .setDisabled(currentPage >= pages.length - 1),
+                new ButtonBuilder()
+                    .setCustomId('buy-item')
+                    .setLabel('Koupit')
+                    .setStyle(ButtonStyle.Success)
+            )
+        );
+    } else {
+        modRows.push(
+            new ActionRowBuilder().addComponents(
+                new ButtonBuilder()
+                    .setCustomId('buy-item')
+                    .setLabel('Koupit')
+                    .setStyle(ButtonStyle.Success)
+            )
+        );
+    }
+
+    const totalPrice = calculateTotalPrice(basePrice, selectedMods);
+    const itemEmbed = createItemEmbed(name, basePrice, totalPrice, selectedMods);
+    
+    if (pages.length > 1) {
+        itemEmbed.setFooter({ text: `Stránka ${currentPage + 1}/${pages.length}` });
+    }
+
+    return {
+        embeds: [itemEmbed],
+        components: modRows
+    };
 }

@@ -1,5 +1,6 @@
 {
     "name": "Tigr-M RWS",
+    "type": "modifiable",
     "basePrice": 5000,
     "modifications": {
         "Camo": [
@@ -19,6 +20,10 @@
         "Roof": [
             { "name": "No weapon", "price": 0 },
             { "name": "Arbalet-DM", "price": 4500 }
+        ],
+        "Wheels": [
+            { "name": "Standard", "price": 0 },
+            { "name": "Run-flat", "price": 500 }
         ]
     }
 }

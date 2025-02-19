@@ -1,5 +1,6 @@
 {
     "name": "VBMR VTT",
+    "type": "modifiable",
     "basePrice": 5000,
     "modifications": {
         "Camo": [

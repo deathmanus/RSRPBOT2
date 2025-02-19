@@ -1,5 +1,6 @@
 {
     "name": "UH-60V Black Hawk",
+    "type": "modifiable",
     "basePrice": 5000,
     "modifications": {
         "Camo": [

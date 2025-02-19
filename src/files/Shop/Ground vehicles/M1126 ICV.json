@@ -1,5 +1,6 @@
 {
     "name": "M1126 ICV",
+    "type": "modifiable",
     "basePrice": 5000,
     "modifications": {
         "Camo": [

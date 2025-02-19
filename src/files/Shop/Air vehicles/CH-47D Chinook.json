@@ -1,5 +1,6 @@
 {
     "name": "CH-47D Chinook",
+    "type": "modifiable",
     "basePrice": 5000,
     "modifications": {
         "Camo": [

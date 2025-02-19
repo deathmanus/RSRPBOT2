@@ -3,29 +3,25 @@ const { REST } = require('@discordjs/rest');
 const { Routes } = require('discord-api-types/v9');
 const fs = require('fs');
 
-const clientId = '1229367542267514901'; // Add this line
+const clientId = '1229367542267514901';
 
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('reload')
         .setDescription('Znovu načte příkazy bota')
         .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
-        
+
     async execute(interaction) {
         try {
             await interaction.deferReply({ ephemeral: true });
             
-            console.log('\x1b[33m%s\x1b[0m', '[RELOAD] Command reload initiated by ' + interaction.user.tag);
-            
-            // Reload commands
             const client = interaction.client;
-            const commandFolders = fs.readdirSync("./src/commands");
+            console.log('\x1b[33m%s\x1b[0m', '[RELOAD] Full command reload initiated by ' + interaction.user.tag);
             
-            // Clear existing commands
             client.commands.clear();
             client.commandArray = [];
 
-            // Reload commands
+            const commandFolders = fs.readdirSync("./src/commands");
             for (const folder of commandFolders) {
                 const commandFiles = fs.readdirSync(`./src/commands/${folder}`).filter(file => file.endsWith('.js'));
                 for (const file of commandFiles) {
@@ -36,26 +32,23 @@ module.exports = {
                 }
             }
 
-            // Update commands with Discord API using clientId directly
             const rest = new REST({ version: '9' }).setToken(process.env.token);
             await rest.put(
-                Routes.applicationCommands(clientId), { // Changed this line
-                    body: client.commandArray
-                }
+                Routes.applicationCommands(clientId),
+                { body: client.commandArray }
             );
-            
-            console.log('\x1b[32m%s\x1b[0m', '[RELOAD] Commands successfully reloaded');
-            
-            await interaction.editReply({ 
-                content: '✅ Příkazy byly úspěšně znovu načteny.',
-                ephemeral: true 
-            });
 
+            console.log('\x1b[32m%s\x1b[0m', '[RELOAD] All commands successfully reloaded');
+            
+            await interaction.editReply({
+                content: '✅ Všechny příkazy byly úspěšně přenačteny.',
+                ephemeral: true
+            });
         } catch (error) {
             console.error('\x1b[31m%s\x1b[0m', '[RELOAD ERROR]', error);
-            await interaction.editReply({ 
+            await interaction.editReply({
                 content: '❌ Chyba při načítání příkazů.',
-                ephemeral: true 
+                ephemeral: true
             });
         }
     }

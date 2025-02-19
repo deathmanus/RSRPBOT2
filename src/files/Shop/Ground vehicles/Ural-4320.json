@@ -1,5 +1,6 @@
 {
     "name": "Ural-4320",
+    "type": "modifiable",
     "basePrice": 5000,
     "modifications": {
         "Camo": [

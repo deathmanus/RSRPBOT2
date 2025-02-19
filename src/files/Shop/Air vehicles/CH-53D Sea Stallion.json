@@ -1,5 +1,6 @@
 {
     "name": "CH-53D Sea Stallion",
+    "type": "modifiable",
     "basePrice": 5000,
     "modifications": {
         "Camo": [
