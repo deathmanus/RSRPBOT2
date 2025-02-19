@@ -41,6 +41,7 @@ module.exports = {
             let selectedSection = null;
             let selectedItem = null;
             let selectedMods = [];
+            let itemState = null;
 
             const createSectionMenu = (selected = null) => {
                 return new StringSelectMenuBuilder()
@@ -117,39 +118,54 @@ module.exports = {
                         selectedItem = i.values[0];
                         const itemPath = path.join(shopDir, selectedSection, `${selectedItem}.json`);
                         const itemData = JSON.parse(fs.readFileSync(itemPath, 'utf8'));
-                        const { name, basePrice, modifications } = itemData;
-                    
-                        // Initialize modifications with default selections
-                        selectedMods = Object.entries(modifications).map(([modName, modValues]) => {
-                            const defaultOption = modValues[0];
-                            return {
-                                modName,
-                                selected: `${modName}:${defaultOption.name}:${defaultOption.price || 0}`,
-                                subSelections: defaultOption.subOptions ? 
-                                    Object.fromEntries(
-                                        Object.entries(defaultOption.subOptions).map(([subName, subValues]) => [
-                                            subName,
-                                            {
-                                                name: subValues[0].name,
-                                                price: subValues[0].price || 0
-                                            }
-                                        ])
-                                    ) : {}
-                            };
-                        });
-                    
-                        const { pages, totalModifications } = createModificationPages(modifications, selectedMods);
-                        const currentPage = 0;
-                    
-                        // Store in collector for later use
-                        collector.pages = pages;
-                        collector.currentPage = currentPage;
-                        collector.totalModifications = totalModifications;
-                    
-                        const display = updateModificationDisplay(i, itemData, selectedMods, currentPage);
-                        await i.editReply(display);
+
+                        switch (itemData.type) {
+                            case 'countable':
+                                const countDisplay = createCountableDisplay(itemData);
+                                await i.editReply({
+                                    embeds: [countDisplay.embed],
+                                    components: countDisplay.components
+                                });
+                                itemState = { type: 'countable', selectedCount: 1 };
+                                break;
+
+                            case 'modifiable':
+                                // Existing modifiable item code...
+                                selectedMods = Object.entries(itemData.modifications).map(([modName, modValues]) => {
+                                    const defaultOption = modValues[0];
+                                    return {
+                                        modName,
+                                        selected: `${modName}:${defaultOption.name}:${defaultOption.price || 0}`,
+                                        subSelections: defaultOption.subOptions ? 
+                                            Object.fromEntries(
+                                                Object.entries(defaultOption.subOptions).map(([subName, subValues]) => [
+                                                    subName,
+                                                    {
+                                                        name: subValues[0].name,
+                                                        price: subValues[0].price || 0
+                                                    }
+                                                ])
+                                            ) : {}
+                                    };
+                                });
+
+                                const { pages, totalModifications } = createModificationPages(itemData.modifications, selectedMods);
+                                collector.pages = pages;
+                                collector.currentPage = 0;
+                                
+                                const display = updateModificationDisplay(i, itemData, selectedMods, 0);
+                                await i.editReply(display);
+                                itemState = { type: 'modifiable', selectedMods };
+                                break;
+
+                            default:
+                                await i.editReply({
+                                    content: '❌ Neplatný typ předmětu.',
+                                    components: []
+                                });
+                                return;
+                        }
                     }
-                    // In the select-mod handler:
                     else if (i.customId.startsWith('select-mod-')) {
                         const modIndex = parseInt(i.customId.split('-')[2], 10);
                         const [modName, optName, optPrice] = i.values[0].split(':');
@@ -181,7 +197,6 @@ module.exports = {
                         const display = updateModificationDisplay(i, itemData, selectedMods, collector.currentPage || 0);
                         await i.editReply(display);
                     }
-                    // In the select-submod handler:
                     else if (i.customId.startsWith('select-submod-')) {
                         const parts = i.customId.split('-');
                         const modIndex = parseInt(parts[2], 10);  // Changed from parts[1]
@@ -259,7 +274,6 @@ module.exports = {
                         const display = updateModificationDisplay(i, itemData, selectedMods, collector.currentPage || 0);
                         await i.editReply(display);
                     }
-                    // In the page navigation handlers:
                     else if (i.customId === 'prev-page' || i.customId === 'next-page') {
                         const direction = i.customId === 'next-page' ? 1 : -1;
                         const itemPath = path.join(shopDir, selectedSection, `${selectedItem}.json`);
@@ -273,6 +287,19 @@ module.exports = {
                     
                         const display = updateModificationDisplay(i, itemData, selectedMods, collector.currentPage);
                         await i.editReply(display);
+                    }
+                    else if (i.customId === 'select-count') {
+                        const count = parseInt(i.values[0]);
+                        const itemPath = path.join(shopDir, selectedSection, `${selectedItem}.json`);
+                        const itemData = JSON.parse(fs.readFileSync(itemPath, 'utf8'));
+                        
+                        itemState.selectedCount = count;
+                        const countDisplay = createCountableDisplay(itemData, count);
+                        
+                        await i.editReply({
+                            embeds: [countDisplay.embed],
+                            components: countDisplay.components
+                        });
                     }
                     else if (i.customId === 'buy-item') {
                         try {
@@ -296,7 +323,20 @@ module.exports = {
                             const itemData = JSON.parse(fs.readFileSync(itemPath, 'utf8'));
                             const { name, basePrice } = itemData;
                     
-                            let totalPrice = calculateTotalPrice(basePrice, selectedMods);
+                            let totalPrice = 0;
+                            let purchaseDescription = '';
+
+                            switch (itemData.type) {
+                                case 'countable':
+                                    totalPrice = itemData.basePrice * itemState.selectedCount;
+                                    purchaseDescription = `${itemState.selectedCount}x ${itemData.name}`;
+                                    break;
+
+                                case 'modifiable':
+                                    totalPrice = calculateTotalPrice(itemData.basePrice, itemState.selectedMods);
+                                    purchaseDescription = `${itemData.name} s modifikacemi`;
+                                    break;
+                            }
                     
                             // Kontrola financí frakce
                             if (fractionData.money < totalPrice) {
@@ -362,31 +402,74 @@ module.exports = {
                             confirmCollector.on('collect', async confirm => {
                                 if (confirm.customId === 'confirm-purchase') {
                                     try {
-                                        // Generate unique ID first
-                                        const uniqueId = Date.now().toString(36) + Math.random().toString(36).substr(2);
-                                        
-                                        // Create fraction section folder
                                         const fractionSectionPath = path.join(fractionPath, selectedSection);
                                         if (!fs.existsSync(fractionSectionPath)) {
                                             fs.mkdirSync(fractionSectionPath, { recursive: true });
                                         }
                             
-                                        // Save purchase data
-                                        const purchaseData = {
-                                            id: uniqueId,
-                                            name,
-                                            basePrice,
-                                            totalPrice,
-                                            purchaseDate: new Date().toISOString(),
-                                            buyer: interaction.user.tag,
-                                            selectedMods
-                                        };
+                                        if (itemData.type === 'countable') {
+                                            // Check for existing items of the same type
+                                            const existingFiles = fs.readdirSync(fractionSectionPath)
+                                                .filter(file => file.endsWith('.json'));
+                                            
+                                            let existingItem = null;
+                                            let existingItemPath = null;
                             
-                                        // Write purchase file
-                                        fs.writeFileSync(
-                                            path.join(fractionSectionPath, `${uniqueId}.json`),
-                                            JSON.stringify(purchaseData, null, 2)
-                                        );
+                                            for (const file of existingFiles) {
+                                                const itemPath = path.join(fractionSectionPath, file);
+                                                const item = JSON.parse(fs.readFileSync(itemPath));
+                                                
+                                                if (item.name === name && item.basePrice === basePrice) {
+                                                    existingItem = item;
+                                                    existingItemPath = itemPath;
+                                                    break;
+                                                }
+                                            }
+                            
+                                            if (existingItem) {
+                                                // Update existing item
+                                                existingItem.count += itemState.selectedCount;
+                                                existingItem.totalPrice = existingItem.count * basePrice;
+                                                fs.writeFileSync(existingItemPath, JSON.stringify(existingItem, null, 2));
+                            
+                                                // Update purchase data for the confirmation message
+                                                purchaseData = existingItem;
+                                            } else {
+                                                // Create new item
+                                                const uniqueId = Date.now().toString(36) + Math.random().toString(36).substr(2);
+                                                purchaseData = {
+                                                    id: uniqueId,
+                                                    name,
+                                                    basePrice,
+                                                    count: itemState.selectedCount,
+                                                    totalPrice: itemData.basePrice * itemState.selectedCount,
+                                                    purchaseDate: new Date().toISOString(),
+                                                    buyer: interaction.user.tag
+                                                };
+                            
+                                                fs.writeFileSync(
+                                                    path.join(fractionSectionPath, `${uniqueId}.json`),
+                                                    JSON.stringify(purchaseData, null, 2)
+                                                );
+                                            }
+                                        } else {
+                                            // Handle modifiable items as before
+                                            const uniqueId = Date.now().toString(36) + Math.random().toString(36).substr(2);
+                                            purchaseData = {
+                                                id: uniqueId,
+                                                name,
+                                                basePrice,
+                                                selectedMods,
+                                                totalPrice,
+                                                purchaseDate: new Date().toISOString(),
+                                                buyer: interaction.user.tag
+                                            };
+                            
+                                            fs.writeFileSync(
+                                                path.join(fractionSectionPath, `${uniqueId}.json`),
+                                                JSON.stringify(purchaseData, null, 2)
+                                            );
+                                        }
                             
                                         // Update fraction money
                                         fractionData.money -= totalPrice;
@@ -395,7 +478,7 @@ module.exports = {
                                             JSON.stringify(fractionData, null, 2)
                                         );
                             
-                                        // Create purchase confirmation embed
+                                        // Create purchase confirmation embed with updated information
                                         const purchaseEmbed = new EmbedBuilder()
                                             .setColor(0x00FF00)
                                             .setTitle('✅ Nákup dokončen')
@@ -403,12 +486,25 @@ module.exports = {
                                             .addFields(
                                                 { name: 'Položka', value: name, inline: true },
                                                 { name: 'Sekce', value: selectedSection, inline: true },
-                                                { name: 'Celková cena', value: `${totalPrice} $`, inline: true },
-                                                { name: 'Vybrané možnosti', value: selectedOptions.length > 0 ? selectedOptions.join('\n') : 'Žádné možnosti' },
-                                                { name: 'Nový stav účtu', value: `${fractionData.money} $` },
-                                                { name: 'ID předmětu', value: uniqueId }
-                                            )
-                                            .setTimestamp();
+                                                { name: 'Celková cena', value: `${totalPrice} $`, inline: true }
+                                            );
+                            
+                                        // Add type-specific fields
+                                        if (itemData.type === 'countable') {
+                                            purchaseEmbed.addFields(
+                                                { name: 'Přidané množství', value: `${itemState.selectedCount}x`, inline: true },
+                                                { name: 'Celkové množství', value: `${purchaseData.count}x`, inline: true }
+                                            );
+                                        } else {
+                                            purchaseEmbed.addFields(
+                                                { name: 'Vybrané možnosti', value: selectedOptions.length > 0 ? selectedOptions.join('\n') : 'Žádné možnosti' }
+                                            );
+                                        }
+                            
+                                        purchaseEmbed.addFields(
+                                            { name: 'Nový stav účtu', value: `${fractionData.money} $` },
+                                            { name: 'ID předmětu', value: purchaseData.id }
+                                        ).setTimestamp();
                             
                                         // Update original message
                                         await i.editReply({
@@ -757,5 +853,48 @@ function updateModificationDisplay(interaction, itemData, selectedMods, currentP
     return {
         embeds: [itemEmbed],
         components: modRows
+    };
+}
+
+// First, add item type check helpers
+function createCountableDisplay(itemData, count = 1) {
+    const { name, basePrice, description } = itemData;
+    const totalPrice = basePrice * count;
+    const FIXED_MAX = 25; // Fixed maximum of 25 options
+
+    const countMenu = new ActionRowBuilder().addComponents(
+        new StringSelectMenuBuilder()
+            .setCustomId('select-count')
+            .setPlaceholder('Vyberte množství')
+            .addOptions(
+                Array.from({ length: FIXED_MAX }, (_, i) => i + 1).map(num => ({
+                    label: `${num}x (${num * basePrice}$)`,
+                    value: num.toString(),
+                    default: num === count
+                }))
+            )
+    );
+
+    const embed = new EmbedBuilder()
+        .setColor(0x00FF00)
+        .setTitle(name)
+        .setDescription(description || '')
+        .addFields(
+            { name: 'Cena za kus', value: `${basePrice} $`, inline: true },
+            { name: 'Množství', value: count.toString(), inline: true },
+            { name: 'Celková cena', value: `${totalPrice} $`, inline: true }
+        );
+
+    return {
+        embed,
+        components: [
+            countMenu,
+            new ActionRowBuilder().addComponents(
+                new ButtonBuilder()
+                    .setCustomId('buy-item')
+                    .setLabel('Koupit')
+                    .setStyle(ButtonStyle.Success)
+            )
+        ]
     };
 }
