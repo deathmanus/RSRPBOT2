@@ -17,6 +17,16 @@ module.exports = {
         .setDescription('Upravit nebo prodat předmět frakce'),
 
     async execute(interaction) {
+        // Kontrola rolí
+        if (!interaction.member.roles.cache.some(role => 
+            role.name.startsWith('Velitel') || role.name.startsWith('Zástupce')
+        )) {
+            return interaction.reply({ 
+                content: '❌ Nemáš oprávnění použít tento příkaz! Pouze velitelé a zástupci frakcí mohou používat tento příkaz.',
+                ephemeral: true 
+            });
+        }
+
         try {
             await interaction.deferReply({ ephemeral: true });
 

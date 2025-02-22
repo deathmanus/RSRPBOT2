@@ -1,7 +1,15 @@
-const { Client, GatewayIntentBits, PermissionsBitField, Permissions, MessageManager, Embed, Collection, ClientPresence } = require(`discord.js`);
+const { Client, GatewayIntentBits,Collection} = require(`discord.js`);
 const { EmbedBuilder } = require(`@discordjs/builders`);
 const fs = require('fs');
-const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent] });
+const client = new Client({ 
+    intents: [
+        GatewayIntentBits.Guilds,
+        GatewayIntentBits.GuildMembers,
+        GatewayIntentBits.GuildPresences
+    ] 
+});
+const IncomeSystem = require('./systems/incomeSystem');
+
 
 client.commands = new Collection();
 
@@ -40,8 +48,12 @@ const logChannelId = '1213225816201240587';
     });
 
     client.once('ready', () => {
+        const incomeSystem = new IncomeSystem(client);
     });
     
+
     
-    client.login(process.env.token)
+    client.login(process.env.TOKEN);
+
+    
 })();

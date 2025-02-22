@@ -3,6 +3,11 @@
     "basePrice": 15100,
     "type": "modifiable",
     "modifications": {
+        "test": [
+            { "name": "NATO green", "price": 0 },
+            { "name": "Caïman", "price": 0 },
+            { "name": "Bundeswehr", "price": 0 }
+        ],
         "Camo": [
             { "name": "NATO green", "price": 0 },
             { "name": "Caïman", "price": 0 },

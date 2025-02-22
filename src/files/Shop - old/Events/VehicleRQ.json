@@ -1,7 +1,0 @@
-{
-    "name": "Custom Vehicle Request",
-    "type": "event",
-    "ticketCategory": "vehicle-requests",
-    "description": "Žádost o vlastní vozidlo",
-    "ticketMessage": "Nová žádost o vlastní vozidlo od {user}"
-}
