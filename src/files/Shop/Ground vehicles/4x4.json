@@ -1,7 +1,7 @@
 {
     "name": "4x4",
+    "basePrice": 1850,
     "type": "modifiable",
-    "basePrice": 5000,
     "modifications": {
         "Camo": [
             { "name": "FS 34094 (Green)", "price": 0 },
@@ -9,7 +9,17 @@
         ],
         "Config": [
             { "name": "Light", "price": 0 },
-            { "name": "Heavy", "price": 1000 }
+            { 
+                "name": "Heavy",
+                "price": 1000,
+                "subOptions": {
+                    "Back": [
+                        { "name": "No weapon", "price": 0},
+                        { "name": "M2A1", "price": 1500},
+                        { "name": "M240B", "price": 1000}
+                    ]
+                }
+            }
         ]
     }
 }

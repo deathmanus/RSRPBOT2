@@ -5,8 +5,8 @@ const path = require('path');
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('spawnfraction')
-        .setDescription('Zobrazí seznam frakcí a jejich itemů')
-        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
+        .setDescription('Zobrazí seznam frakcí a jejich itemů'),
+        
 
     async execute(interaction) {
         try {

@@ -1,14 +1,14 @@
 {
     "name": "UH-60V Black Hawk",
+    "basePrice": 14750,
     "type": "modifiable",
-    "basePrice": 5000,
     "modifications": {
         "Camo": [
             { "name": "Aircraft Green", "price": 0 }
         ],
         "Config": [
             { "name": "Stock", "price": 0 },
-            { "name": "FRIES bar", "price": 500 }
+            { "name": "FRIES bar", "price": 2750 }
         ],
         "GunRight": [
             { "name": "No weapon", "price": 0 },

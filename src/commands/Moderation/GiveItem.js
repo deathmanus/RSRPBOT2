@@ -5,8 +5,8 @@ const path = require('path');
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('giveitem')
-        .setDescription('Přidat item frakci')
-        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
+        .setDescription('Přidat item frakci'),
+    
 
     async execute(interaction) {
         try {

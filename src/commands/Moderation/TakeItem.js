@@ -5,9 +5,8 @@ const path = require('path');
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('takeitem')
-        .setDescription('Odebrat item frakci')
-        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
-
+        .setDescription('Odebrat item frakci'),
+        
     async execute(interaction) {
         try {
             await interaction.deferReply({ ephemeral: true });

@@ -1,7 +1,7 @@
 {
     "name": "VBMR VTT",
+    "basePrice": 7000,
     "type": "modifiable",
-    "basePrice": 5000,
     "modifications": {
         "Camo": [
             { "name": "NATO scheme", "price": 0 },
@@ -9,12 +9,17 @@
             { "name": "Desert", "price": 0 }
         ],
         "Config": [
-            { "name": "Stock", "price": 0 },
+            {
+                "name": "Stock",
+                "price": 0,
+                "subOptions": {
+                    "Camonet": [
+                        { "name": "None", "price": 0 },
+                        { "name": "Camonet", "price": 100 }
+                    ]
+                }
+            },
             { "name": "Heavy", "price": 2500 }
-        ],
-        "Camonet": [
-            { "name": "None", "price": 0 },
-            { "name": "Camonet", "price": 10 }
         ]
     }
 }

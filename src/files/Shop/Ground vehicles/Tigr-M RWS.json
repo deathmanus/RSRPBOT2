@@ -1,15 +1,15 @@
 {
     "name": "Tigr-M RWS",
+    "basePrice": 3450,
     "type": "modifiable",
-    "basePrice": 5000,
     "modifications": {
         "Camo": [
             { "name": "Protective Green", "price": 0 },
-            { "name": "Protective Woodlant mix", "price": 250 }
+            { "name": "Protective Woodlant mix", "price": 0 }
         ],
         "Config": [
             { "name": "STS", "price": 0 },
-            { "name": "AMN upgrade", "price": 0 }
+            { "name": "AMN upgrade", "price": 100 }
         ],
         "Extra": [
             { "name": "N/A", "price": 0 },
@@ -19,11 +19,7 @@
         ],
         "Roof": [
             { "name": "No weapon", "price": 0 },
-            { "name": "Arbalet-DM", "price": 4500 }
-        ],
-        "Wheels": [
-            { "name": "Standard", "price": 0 },
-            { "name": "Run-flat", "price": 500 }
+            { "name": "Arbalet-DM", "price": 3700 }
         ]
     }
 }

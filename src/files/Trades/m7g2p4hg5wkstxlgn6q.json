@@ -1,0 +1,24 @@
+{
+  "id": "m7g2p4hg5wkstxlgn6q",
+  "seller": "test",
+  "buyer": "z",
+  "item": {
+    "id": "m7cbm16w2p3be9gzu8u",
+    "name": "Ammunition Box",
+    "basePrice": 100,
+    "count": 69,
+    "totalPrice": 6900,
+    "purchaseDate": "2025-02-19T19:43:04.328Z",
+    "buyer": "death_man",
+    "type": "countable",
+    "section": "Equipment",
+    "file": "m7cbm16w2p3be9gzu8u.json"
+  },
+  "count": 25,
+  "price": 20,
+  "status": "accepted",
+  "createdAt": "2025-02-22T10:44:36.724Z",
+  "createdBy": "death_man",
+  "acceptedBy": "death_man",
+  "acceptedAt": "2025-02-22T10:44:49.620Z"
+}

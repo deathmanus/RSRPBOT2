@@ -1,7 +1,7 @@
 {
     "name": "VAB VTT",
+    "basePrice": 4000,
     "type": "modifiable",
-    "basePrice": 5000,
     "modifications": {
         "Camo": [
             { "name": "NATO scheme", "price": 0 },

@@ -1,7 +1,7 @@
 {
     "name": "CH-47D Chinook",
+    "basePrice": 11800,
     "type": "modifiable",
-    "basePrice": 5000,
     "modifications": {
         "Camo": [
             { "name": "Aircraft Green", "price": 0 },
@@ -12,11 +12,11 @@
         ],
         "GunRight": [
             { "name": "No weapon", "price": 0 },
-            { "name": "M240H", "price": 2000 }
+            { "name": "M240H", "price": 1200 }
         ],
         "GunLeft": [
             { "name": "No weapon", "price": 0 },
-            { "name": "M240H", "price": 2000 }
+            { "name": "M240H", "price": 1200 }
         ]
     }
 }

@@ -1,7 +1,7 @@
 {
     "name": "PVP",
+    "basePrice": 1750,
     "type": "modifiable",
-    "basePrice": 5000,
     "modifications": {
         "Camo": [
             { "name": "NATO scheme", "price": 0 },
@@ -13,7 +13,7 @@
         ],
         "Camonet": [
             { "name": "N/A", "price": 0 },
-            { "name": "Camonet", "price": 10 }
+            { "name": "Camonet", "price": 200 }
         ],
         "Roof": [
             { "name": "Hatch", "price": 0 },

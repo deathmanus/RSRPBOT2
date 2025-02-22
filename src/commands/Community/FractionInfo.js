@@ -2,10 +2,7 @@ const { SlashCommandBuilder, ActionRowBuilder, StringSelectMenuBuilder, EmbedBui
 const fs = require('fs');
 const path = require('path');
 
-function countItemsInDirectory(dirPath) {
-    if (!fs.existsSync(dirPath)) return 0;
-    return fs.readdirSync(dirPath).filter(file => file.endsWith('.json')).length;
-}
+
 
 // First, modify the item counting function to return more details
 function getInventoryDetails(dirPath) {

@@ -1,7 +1,7 @@
 {
     "name": "MH-6 Little Bird",
+    "basePrice": 7700,
     "type": "modifiable",
-    "basePrice": 1000,
     "modifications": {
         "Camo": [
             { "name": "Black", "price": 0 }

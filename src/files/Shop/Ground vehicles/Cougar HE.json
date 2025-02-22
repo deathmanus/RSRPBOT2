@@ -1,7 +1,7 @@
 {
     "name": "Cougar HE",
-    "type": "modifiable",
     "basePrice": 5000,
+    "type": "modifiable",
     "modifications": {
         "Camo": [
             { "name": "Aircraft Green", "price": 0 },
@@ -11,18 +11,18 @@
             { "name": "Stock", "price": 0 }
         ],
         "Roof": [
-            { "name": "HMMWV weapon station (hatch cover)", "price": 200 },
-            { "name": "HMMWV weapon station (M2A1)", "price": 200 },
-            { "name": "HMMWV weapon station (M240B)", "price": 200 },
-            { "name": "O-GPK (M240B)", "price": 200 },
-            { "name": "O-GPK (M240B with overhead protection)", "price": 200 },
-            { "name": "O-GPK (M2A1)", "price": 200 },
-            { "name": "O-GPK (M2A1 with overhead protection)", "price": 200 }
+            { "name": "HMMWV weapon station (hatch cover)", "price": 0 },
+            { "name": "HMMWV weapon station (M2A1)", "price": 2500 },
+            { "name": "HMMWV weapon station (M240B)", "price": 1800 },
+            { "name": "O-GPK (M240B)", "price": 2450 },
+            { "name": "O-GPK (M240B with overhead protection)", "price": 2750 },
+            { "name": "O-GPK (M2A1)", "price": 2900 },
+            { "name": "O-GPK (M2A1 with overhead protection)", "price": 3200 }
         ],
         "Detail": [
             { "name": "Stock", "price": 0 },
-            { "name": "AN/VLQ-12 CREW Duke", "price": 0 },
-            { "name": "Patrol", "price": 0 }
+            { "name": "Patrol", "price": 350 },
+            { "name": "AN/VLQ-12 CREW Duke", "price": 1000 }
         ]
     }
 }

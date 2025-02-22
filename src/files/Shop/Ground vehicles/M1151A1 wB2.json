@@ -1,7 +1,7 @@
 {
     "name": "M1151A1 w/B2",
+    "basePrice": 2200,
     "type": "modifiable",
-    "basePrice": 5000,
     "modifications": {
         "Camo": [
             { "name": "FS 34094 (Green)", "price": 0 },
@@ -12,12 +12,12 @@
         ],
         "Roof": [
             { "name": "HMMWV weapon station (hatch cover)", "price": 0 },
-            { "name": "HMMWV weapon station (M2A1)", "price": 200 },
-            { "name": "HMMWV weapon station (M240B)", "price": 200 },
-            { "name": "O-GPK (M240B)", "price": 200 },
-            { "name": "O-GPK (M240B with overhead protection)", "price": 200 },
-            { "name": "O-GPK (M2A1)", "price": 200 },
-            { "name": "O-GPK (M2A1 with overhead protection)", "price": 200 }
+            { "name": "HMMWV weapon station (M2A1)", "price": 2000 },
+            { "name": "HMMWV weapon station (M240B)", "price": 1000 },
+            { "name": "O-GPK (M240B)", "price": 1500 },
+            { "name": "O-GPK (M240B with overhead protection)", "price": 1850 },
+            { "name": "O-GPK (M2A1)", "price": 2300 },
+            { "name": "O-GPK (M2A1 with overhead protection)", "price": 2750 }
         ]
     }
 }

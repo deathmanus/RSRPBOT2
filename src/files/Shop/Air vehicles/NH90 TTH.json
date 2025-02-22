@@ -1,14 +1,9 @@
 {
     "name": "NH90 TTH",
+    "basePrice": 15100,
     "type": "modifiable",
-    "basePrice": 5000,
     "modifications": {
         "Camo": [
-            { "name": "NATO green", "price": 0 },
-            { "name": "Caïman", "price": 0 },
-            { "name": "Bundeswehr", "price": 0 }
-        ],
-        "Idk": [
             { "name": "NATO green", "price": 0 },
             { "name": "Caïman", "price": 0 },
             { "name": "Bundeswehr", "price": 0 }

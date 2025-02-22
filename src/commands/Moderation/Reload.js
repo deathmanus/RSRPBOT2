@@ -8,8 +8,8 @@ const clientId = '1229367542267514901';
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('reload')
-        .setDescription('Znovu načte příkazy bota')
-        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
+        .setDescription('Znovu načte příkazy bota'),
+        
 
     async execute(interaction) {
         try {

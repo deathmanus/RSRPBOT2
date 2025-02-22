@@ -1,7 +1,7 @@
 {
     "name": "Ural-4320",
-    "type": "modifiable",
     "basePrice": 5000,
+    "type": "modifiable",
     "modifications": {
         "Camo": [
             { "name": "Protective Green", "price": 0 }

@@ -1,0 +1,35 @@
+{
+    "name": "NH90 TTH",
+    "type": "modifiable",
+    "basePrice": 5000,
+    "modifications": {
+        "Camo": [
+            { "name": "NATO green", "price": 0 },
+            { "name": "Caïman", "price": 0 },
+            { "name": "Bundeswehr", "price": 0 }
+        ],
+        "Idk": [
+            { "name": "NATO green", "price": 0 },
+            { "name": "Caïman", "price": 0 },
+            { "name": "Bundeswehr", "price": 0 }
+        ],
+        "Config": [
+            { "name": "Stock", "price": 0 },
+            { "name": "FRIES bar", "price": 500 },
+            {
+                "name": "Armed",
+                "price": 0,
+                "subOptions": {
+                    "GunRight": [
+                        { "name": "No weapon", "price": 0 },
+                        { "name": "M3M", "price": 3000 }
+                    ],
+                    "GunLeft": [
+                        { "name": "No weapon", "price": 0 },
+                        { "name": "M3M", "price": 3000 }
+                    ]
+                }
+            }
+        ]
+    }
+}
