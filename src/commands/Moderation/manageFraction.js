@@ -614,7 +614,7 @@ async function handleSpawn(interaction) {
         }
 
         const embed = new EmbedBuilder()
-            .setTitle('Seznam frakcí a jejich itemů')
+            .setTitle('Seznam frakcí a jejich modifikovatelných itemů')
             .setColor(0x00FF00)
             .setTimestamp();
 
@@ -631,9 +631,11 @@ async function handleSpawn(interaction) {
                     .filter(file => file.endsWith('.json'))
                     .map(file => {
                         const itemData = JSON.parse(fs.readFileSync(path.join(sectionPath, file)));
+                        // Only process modifiable items
+                        if (!itemData.type || itemData.type !== 'modifiable') return null;
+
                         let itemText = `**${itemData.name}** - `;
                         
-                        // Add modifications
                         if (itemData.selectedMods && itemData.selectedMods.length > 0) {
                             const mods = itemData.selectedMods.map(mod => {
                                 let modText = mod.selected.split(':')[1];
@@ -649,7 +651,8 @@ async function handleSpawn(interaction) {
                             itemText += 'Žádné modifikace';
                         }
                         return itemText;
-                    });
+                    })
+                    .filter(item => item !== null); // Remove null items (non-modifiable)
 
                 if (items.length > 0) {
                     fractionText += `\n__${section}:__\n${items.join('\n')}\n`;
@@ -659,7 +662,7 @@ async function handleSpawn(interaction) {
             if (fractionText) {
                 embed.addFields({
                     name: `📍 ${fraction}`,
-                    value: fractionText || 'Žádné itemy',
+                    value: fractionText || 'Žádné modifikovatelné itemy',
                     inline: false
                 });
             }

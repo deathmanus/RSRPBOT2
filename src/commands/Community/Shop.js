@@ -333,7 +333,38 @@ module.exports = {
                     
                             const itemPath = path.join(shopDir, selectedSection, `${selectedItem}.json`);
                             const itemData = JSON.parse(fs.readFileSync(itemPath, 'utf8'));
-                            const { name, basePrice } = itemData;
+                            const { name, basePrice, maxCount } = itemData;
+
+                            // For countable items, check current count and limits
+                            if (itemData.type === 'countable') {
+                                // Get all existing items of this type in the fraction
+                                const fractionSectionPath = path.join(fractionPath, selectedSection);
+                                let currentCount = 0;
+                    
+                                if (fs.existsSync(fractionSectionPath)) {
+                                    const existingFiles = fs.readdirSync(fractionSectionPath)
+                                        .filter(file => file.endsWith('.json'));
+                    
+                                    for (const file of existingFiles) {
+                                        const existingItem = JSON.parse(
+                                            fs.readFileSync(path.join(fractionSectionPath, file))
+                                        );
+                                        if (existingItem.name === name) {
+                                            currentCount += existingItem.count || 0;
+                                        }
+                                    }
+                                }
+                    
+                                // Check if new purchase would exceed limit
+                                const newTotalCount = currentCount + itemState.selectedCount;
+                                if (newTotalCount > maxCount) {
+                                    return await i.editReply({
+                                        content: `❌ Nelze zakoupit. Limit pro tento item je ${maxCount} ks.\nAktuálně máte: ${currentCount} ks\nMůžete ještě koupit: ${Math.max(0, maxCount - currentCount)} ks`,
+                                        components: [],
+                                        embeds: []
+                                    });
+                                }
+                            }
                     
                             let totalPrice = 0;
                             let purchaseDescription = '';
@@ -419,8 +450,10 @@ module.exports = {
                                             fs.mkdirSync(fractionSectionPath, { recursive: true });
                                         }
                             
+                                        let purchaseData;
+                                        let uniqueId;
+                            
                                         if (itemData.type === 'countable') {
-                                            // Check for existing items of the same type
                                             const existingFiles = fs.readdirSync(fractionSectionPath)
                                                 .filter(file => file.endsWith('.json'));
                                             
@@ -434,6 +467,7 @@ module.exports = {
                                                 if (item.name === name && item.basePrice === basePrice) {
                                                     existingItem = item;
                                                     existingItemPath = itemPath;
+                                                    uniqueId = file.replace('.json', ''); // Get existing ID
                                                     break;
                                                 }
                                             }
@@ -443,12 +477,10 @@ module.exports = {
                                                 existingItem.count += itemState.selectedCount;
                                                 existingItem.totalPrice = existingItem.count * basePrice;
                                                 fs.writeFileSync(existingItemPath, JSON.stringify(existingItem, null, 2));
-                            
-                                                // Update purchase data for the confirmation message
                                                 purchaseData = existingItem;
                                             } else {
                                                 // Create new item
-                                                const uniqueId = Date.now().toString(36) + Math.random().toString(36).substr(2);
+                                                uniqueId = Date.now().toString(36) + Math.random().toString(36).substr(2);
                                                 purchaseData = {
                                                     id: uniqueId,
                                                     name,
@@ -465,8 +497,8 @@ module.exports = {
                                                 );
                                             }
                                         } else {
-                                            // Handle modifiable items as before
-                                            const uniqueId = Date.now().toString(36) + Math.random().toString(36).substr(2);
+                                            // Handle modifiable items
+                                            uniqueId = Date.now().toString(36) + Math.random().toString(36).substr(2);
                                             purchaseData = {
                                                 id: uniqueId,
                                                 name,
@@ -870,16 +902,23 @@ function updateModificationDisplay(interaction, itemData, selectedMods, currentP
 
 // First, add item type check helpers
 function createCountableDisplay(itemData, count = 1) {
-    const { name, basePrice, description } = itemData;
+    const { name, basePrice, description, maxCount = 25, minCount = 1 } = itemData;
     const totalPrice = basePrice * count;
-    const FIXED_MAX = 25; // Fixed maximum of 25 options
+    
+    // Calculate the range for dropdown options
+    const startCount = Math.max(minCount, 1);
+    const maxOptions = 25; // Maximum number of options to show in dropdown
+    const endCount = Math.min(maxCount, startCount + maxOptions - 1);
 
     const countMenu = new ActionRowBuilder().addComponents(
         new StringSelectMenuBuilder()
             .setCustomId('select-count')
             .setPlaceholder('Vyberte množství')
             .addOptions(
-                Array.from({ length: FIXED_MAX }, (_, i) => i + 1).map(num => ({
+                Array.from(
+                    { length: endCount - startCount + 1 }, 
+                    (_, i) => i + startCount
+                ).map(num => ({
                     label: `${num}x (${num * basePrice}$)`,
                     value: num.toString(),
                     default: num === count
@@ -894,7 +933,12 @@ function createCountableDisplay(itemData, count = 1) {
         .addFields(
             { name: 'Cena za kus', value: `${basePrice} $`, inline: true },
             { name: 'Množství', value: count.toString(), inline: true },
-            { name: 'Celková cena', value: `${totalPrice} $`, inline: true }
+            { name: 'Celková cena', value: `${totalPrice} $`, inline: true },
+            { 
+                name: 'Limity', 
+                value: `Minimum: ${minCount} ks\nMaximum: ${maxCount} ks`, 
+                inline: false 
+            }
         );
 
     return {
