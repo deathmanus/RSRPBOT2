@@ -1,8 +1,0 @@
-{
-    "name": "Ammunition Box",
-    "type": "countable",
-    "basePrice": 100,
-    "maxCount": 20,
-    "minCount": 2,
-    "description": "Standardní muniční box"
-}

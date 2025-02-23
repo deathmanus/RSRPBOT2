@@ -122,6 +122,52 @@ function updateModificationDisplay(itemData, selectedMods, currentPage = 0) {
     };
 }
 
+// Add this function near other helper functions in manageItem.js
+function createCountableDisplay(itemData, count = 1, isGiving = true) {
+    const { name } = itemData;
+    
+    const countMenu = new ActionRowBuilder().addComponents(
+        new StringSelectMenuBuilder()
+            .setCustomId('select-count')
+            .setPlaceholder('Vyberte množství')
+            .addOptions(
+                Array.from(
+                    { length: 25 }, 
+                    (_, i) => i + 1
+                ).map(num => ({
+                    label: `${num}x`,
+                    value: num.toString(),
+                    default: num === count
+                }))
+            )
+    );
+
+    const embed = new EmbedBuilder()
+        .setColor(isGiving ? 0x00FF00 : 0xFF0000)
+        .setTitle(name)
+        .addFields(
+            { name: 'Množství', value: count.toString(), inline: true }
+        );
+
+    const actionButton = new ButtonBuilder()
+        .setCustomId('confirm-action')
+        .setLabel(isGiving ? 'Přidat' : 'Odebrat')
+        .setStyle(isGiving ? ButtonStyle.Success : ButtonStyle.Danger);
+
+    const cancelButton = new ButtonBuilder()
+        .setCustomId('cancel-action')
+        .setLabel('Zrušit')
+        .setStyle(ButtonStyle.Secondary);
+
+    return {
+        embed,
+        components: [
+            countMenu,
+            new ActionRowBuilder().addComponents(actionButton, cancelButton)
+        ]
+    };
+}
+
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('item')
@@ -329,55 +375,65 @@ module.exports = {
                         });
                     }
 
+                    // Modify the select-item handler
                     else if (i.customId === 'select-item') {
                         selectedItem = i.values[0];
                         const itemPath = path.join(shopDir, selectedSection, `${selectedItem}.json`);
                         const itemData = JSON.parse(fs.readFileSync(itemPath, 'utf8'));
-
-                        if (isGiving && itemData.modifications) {
-                            // Initialize selectedMods with proper default selections
-                            selectedMods = Object.entries(itemData.modifications).map(([modName, modValues]) => {
-                                const defaultOption = modValues[0]; // Get first option as default
-                                const mod = {
-                                    modName,
-                                    selected: `${modName}:${defaultOption.name}:${defaultOption.price || 0}`,
-                                    subSelections: {}
-                                };
-
-                                // Initialize sub-selections if they exist
-                                if (defaultOption.subOptions) {
-                                    Object.entries(defaultOption.subOptions).forEach(([subName, subValues]) => {
-                                        if (Array.isArray(subValues) && subValues.length > 0) {
-                                            mod.subSelections[subName] = {
-                                                name: subValues[0].name,
-                                                price: subValues[0].price || 0
-                                            };
-                                        }
-                                    });
-                                }
-
-                                return mod;
-                            });
-
-                            currentPage = 0;
-                            const display = updateModificationDisplay(itemData, selectedMods, currentPage);
-                            await i.editReply(display);
-                        } else {
-                            const actionButton = new ButtonBuilder()
-                                .setCustomId('confirm-action')
-                                .setLabel(isGiving ? 'Přidat' : 'Odebrat')
-                                .setStyle(isGiving ? ButtonStyle.Success : ButtonStyle.Danger);
-
-                            const cancelButton = new ButtonBuilder()
-                                .setCustomId('cancel-action')
-                                .setLabel('Zrušit')
-                                .setStyle(ButtonStyle.Secondary);
-
-                            await i.editReply({
-                                embeds: [createItemEmbed(itemData, [], isGiving)],
-                                components: [new ActionRowBuilder().addComponents(actionButton, cancelButton)]
-                            });
+                    
+                        if (isGiving) {
+                            if (itemData.type === 'countable') {
+                                itemState = { type: 'countable', selectedCount: 1 };
+                                const display = createCountableDisplay(itemData, 1, isGiving);
+                                await i.editReply({
+                                    embeds: [display.embed],
+                                    components: display.components
+                                });
+                            } else if (itemData.modifications) {
+                                // Initialize selectedMods with proper default selections
+                                selectedMods = Object.entries(itemData.modifications).map(([modName, modValues]) => {
+                                    const defaultOption = modValues[0]; // Get first option as default
+                                    const mod = {
+                                        modName,
+                                        selected: `${modName}:${defaultOption.name}:${defaultOption.price || 0}`,
+                                        subSelections: {}
+                                    };
+                    
+                                    // Initialize sub-selections if they exist
+                                    if (defaultOption.subOptions) {
+                                        Object.entries(defaultOption.subOptions).forEach(([subName, subValues]) => {
+                                            if (Array.isArray(subValues) && subValues.length > 0) {
+                                                mod.subSelections[subName] = {
+                                                    name: subValues[0].name,
+                                                    price: subValues[0].price || 0
+                                                };
+                                            }
+                                        });
+                                    }
+                    
+                                    return mod;
+                                });
+                    
+                                currentPage = 0;
+                                const display = updateModificationDisplay(itemData, selectedMods, currentPage);
+                                await i.editReply(display);
+                            }
                         }
+                    }
+
+                    // Add the select-count handler
+                    else if (i.customId === 'select-count') {
+                        const count = parseInt(i.values[0]);
+                        const itemPath = path.join(shopDir, selectedSection, `${selectedItem}.json`);
+                        const itemData = JSON.parse(fs.readFileSync(itemPath, 'utf8'));
+                        
+                        itemState = { type: 'countable', selectedCount: count };
+                        const display = createCountableDisplay(itemData, count, isGiving);
+                        
+                        await i.editReply({
+                            embeds: [display.embed],
+                            components: display.components
+                        });
                     }
 
                     else if (i.customId.startsWith('select-mod-')) {
@@ -459,6 +515,7 @@ module.exports = {
                         await i.editReply(display);
                     }
 
+                    // Modify the confirm-action handler to handle countable items
                     else if (i.customId === 'confirm-action') {
                         try {
                             if (isGiving) {
@@ -467,34 +524,94 @@ module.exports = {
                                 fs.mkdirSync(targetDir, { recursive: true });
                     
                                 const itemData = JSON.parse(fs.readFileSync(sourcePath, 'utf8'));
-                                const newItemData = {
-                                    ...itemData,
-                                    id: `${selectedItem}_${Date.now()}`,
-                                    addedBy: interaction.user.tag,
-                                    addedDate: new Date().toISOString(),
-                                    selectedMods
-                                };
                     
-                                const resultEmbed = new EmbedBuilder()
-                                    .setColor(0x00FF00)
-                                    .setTitle('✅ Item přidán')
-                                    .setDescription(`Item byl úspěšně přidán do frakce ${selectedFraction}`)
-                                    .addFields(
-                                        { name: 'Item', value: itemData.name, inline: true },
-                                        { name: 'Sekce', value: selectedSection, inline: true },
-                                        { name: 'ID', value: newItemData.id, inline: true }
-                                    );
+                                // In the confirm-action handler, modify the countable item section
+                                if (itemData.type === 'countable') {
+                                    const existingFiles = fs.readdirSync(targetDir)
+                                        .filter(file => file.endsWith('.json'));
+                                    
+                                    let existingItem = null;
+                                    let existingItemPath = null;
+                                
+                                    // Find existing item with the same name and basePrice
+                                    for (const file of existingFiles) {
+                                        const checkPath = path.join(targetDir, file);
+                                        const checkItem = JSON.parse(fs.readFileSync(checkPath));
+                                        
+                                        // Compare both name and basePrice to ensure it's the exact same item type
+                                        if (checkItem.name === itemData.name && 
+                                            checkItem.type === 'countable' && 
+                                            checkItem.basePrice === itemData.basePrice) {
+                                            existingItem = checkItem;
+                                            existingItemPath = checkPath;
+                                            break;
+                                        }
+                                    }
+                                
+                                    if (existingItem) {
+                                        // Update existing item
+                                        existingItem.count += itemState.selectedCount;
+                                        fs.writeFileSync(existingItemPath, JSON.stringify(existingItem, null, 2));
+                                
+                                        const resultEmbed = new EmbedBuilder()
+                                            .setColor(0x00FF00)
+                                            .setTitle('✅ Item aktualizován')
+                                            .setDescription(`Množství bylo úspěšně přidáno do frakce ${selectedFraction}`)
+                                            .addFields(
+                                                { name: 'Item', value: itemData.name, inline: true },
+                                                { name: 'Přidáno', value: `${itemState.selectedCount}x`, inline: true },
+                                                { name: 'Nové množství', value: `${existingItem.count}x`, inline: true },
+                                                { name: 'ID', value: existingItem.id, inline: true }
+                                            );
+                                
+                                        await i.editReply({
+                                            content: null,
+                                            embeds: [resultEmbed],
+                                            components: []
+                                        });
+                                    } else {
+                                        // Create new item
+                                        const newItemData = {
+                                            ...itemData,
+                                            id: `${selectedItem}_${Date.now()}`,
+                                            addedBy: interaction.user.tag,
+                                            addedDate: new Date().toISOString(),
+                                            count: itemState.selectedCount
+                                        };
                     
-                                fs.writeFileSync(
-                                    path.join(targetDir, `${newItemData.id}.json`),
-                                    JSON.stringify(newItemData, null, 2)
-                                );
+                                        fs.writeFileSync(
+                                            path.join(targetDir, `${newItemData.id}.json`),
+                                            JSON.stringify(newItemData, null, 2)
+                                        );
                     
-                                await i.editReply({
-                                    content: null,
-                                    embeds: [resultEmbed],
-                                    components: []
-                                });
+                                        const resultEmbed = new EmbedBuilder()
+                                            .setColor(0x00FF00)
+                                            .setTitle('✅ Item přidán')
+                                            .setDescription(`Item byl úspěšně přidán do frakce ${selectedFraction}`)
+                                            .addFields(
+                                                { name: 'Item', value: itemData.name, inline: true },
+                                                { name: 'Množství', value: `${itemState.selectedCount}x`, inline: true },
+                                                { name: 'ID', value: newItemData.id, inline: true }
+                                            );
+                    
+                                        await i.editReply({
+                                            content: null,
+                                            embeds: [resultEmbed],
+                                            components: []
+                                        });
+                                    }
+                                } else {
+                                    // Existing modifiable item handling...
+                                    const newItemData = {
+                                        ...itemData,
+                                        id: `${selectedItem}_${Date.now()}`,
+                                        addedBy: interaction.user.tag,
+                                        addedDate: new Date().toISOString(),
+                                        selectedMods
+                                    };
+                    
+                                    // Rest of the modifiable item code...
+                                }
                             } else {
                                 // Remove the .json extension since it's already in the selectedItem
                                 const itemPath = path.join(fractionsDir, selectedFraction, selectedSection, selectedItem);

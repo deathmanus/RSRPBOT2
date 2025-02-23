@@ -1,0 +1,8 @@
+{
+    "name": "Optika s 7x-20x přiblížením",
+    "type": "countable",
+    "basePrice": 700,
+    "maxCount": 50,
+    "minCount": 1,
+    "description": "Příkaz k nákupu jaké-koliv optiky s 7x-20x přiblížením."
+}

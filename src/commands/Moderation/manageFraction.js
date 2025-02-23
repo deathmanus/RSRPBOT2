@@ -10,6 +10,7 @@ const {
 } = require('discord.js');
 const fs = require('fs');
 const path = require('path');
+const axios = require('axios');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -34,7 +35,11 @@ module.exports = {
                 .addStringOption(option =>
                     option.setName('barva')
                         .setDescription('Barva v hexadecimálním formátu (např. FF0000)')
-                        .setRequired(true)))
+                        .setRequired(true))
+                .addAttachmentOption(option =>
+                    option.setName('logo')
+                        .setDescription('Logo frakce')
+                        .setRequired(false)))
         .addSubcommand(subcommand =>
             subcommand
                 .setName('delete')
@@ -71,9 +76,16 @@ async function handleCreate(interaction) {
         const nazev = interaction.options.getString('nazev');
         const popis = interaction.options.getString('popis');
         const barva = interaction.options.getString('barva');
+        const logo = interaction.options.getAttachment('logo');
 
         if (!/^#[0-9A-Fa-f]{6}$/.test(`#${barva}`)) {
             return interaction.editReply({ content: '❌ Barva musí být hexadecimální kód o délce 6 znaků (např. FF0000).' });
+        }
+
+        if (logo && !logo.contentType?.startsWith('image/')) {
+            return interaction.editReply({ 
+                content: '❌ Logo musí být obrázek.'
+            });
         }
 
         const guild = interaction.guild;
@@ -121,6 +133,18 @@ async function handleCreate(interaction) {
         const fractionDir = path.join(__dirname, '../../files/Fractions', zkratka);
         fs.mkdirSync(fractionDir, { recursive: true });
 
+        let logoPath = null;
+        if (logo) {
+            try {
+                const response = await axios.get(logo.url, { responseType: 'arraybuffer' });
+                const imageExt = logo.contentType.split('/')[1];
+                logoPath = `logo.${imageExt}`;
+                fs.writeFileSync(path.join(fractionDir, logoPath), response.data);
+            } catch (error) {
+                console.error('Error saving logo:', error);
+            }
+        }
+
         const fractionData = {
             nazev,
             popis,
@@ -130,15 +154,28 @@ async function handleCreate(interaction) {
             fractionRoleId: fractionRole.id,
             money: 0,
             warns: 0,
-            creationDate: new Date().toISOString().split('T')[0]
+            creationDate: new Date().toISOString().split('T')[0],
+            logoUrl: logoPath
         };
         fs.writeFileSync(path.join(fractionDir, `${zkratka}.json`), JSON.stringify(fractionData, null, 2));
 
-        const attachment = new AttachmentBuilder(path.join(fractionDir, `${zkratka}.json`));
+        const resultEmbed = new EmbedBuilder()
+            .setColor(`#${barva}`)
+            .setTitle('✅ Frakce vytvořena')
+            .setDescription(`Frakce ${zkratka} byla úspěšně vytvořena!`)
+            .addFields(
+                { name: 'Název', value: nazev, inline: true },
+                { name: 'Zkratka', value: zkratka, inline: true },
+                { name: 'Role', value: `${leaderRole}, ${deputyRole}, ${fractionRole}`, inline: false },
+                { name: 'Kanál', value: `${room}`, inline: true }
+            );
+
+        if (logo) {
+            resultEmbed.setThumbnail(logo.url);
+        }
 
         await interaction.editReply({ 
-            content: `✅ Kanál ${room} byl vytvořen! Role ${leaderRole}, ${deputyRole}, ${fractionRole} taky. Oprávnění pro příkazy byly nastaveny.`, 
-            files: [attachment] 
+            embeds: [resultEmbed]
         });
 
     } catch (error) {

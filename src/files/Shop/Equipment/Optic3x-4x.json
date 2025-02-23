@@ -1,0 +1,8 @@
+{
+    "name": "Optika s 3x-4x přiblížením",
+    "type": "countable",
+    "basePrice": 350,
+    "maxCount": 50,
+    "minCount": 1,
+    "description": "Příkaz k nákupu jaké-koliv optiky s 3x-4x přiblížením."
+}
