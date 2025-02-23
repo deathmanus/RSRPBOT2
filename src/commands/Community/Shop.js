@@ -627,6 +627,52 @@ module.exports = {
                             });
                         }
                     }
+                    // In the collector.on('collect') handler, update the back button logic:
+                    else if (i.customId === 'back-to-items') {
+                        try {
+                            // Get items for the current section
+                            const sectionDir = path.join(shopDir, selectedSection);
+                            const items = fs.readdirSync(sectionDir, { withFileTypes: true })
+                                .filter(dirent => dirent.isFile() && dirent.name.endsWith('.json'))
+                                .map(dirent => dirent.name.replace('.json', ''));
+                    
+                            const itemMenu = new StringSelectMenuBuilder()
+                                .setCustomId('select-shop-item')
+                                .setPlaceholder('Vyberte položku k zobrazení')
+                                .addOptions(items.map(item => ({
+                                    label: item,
+                                    value: item
+                                })));
+                    
+                            const sectionEmbed = new EmbedBuilder()
+                                .setColor(0x00FF00)
+                                .setTitle(`Sekce: ${selectedSection}`)
+                                .setDescription('Vyberte položku z dropdown menu.');
+                    
+                            // Just use editReply directly without deferUpdate
+                            await interaction.editReply({
+                                embeds: [sectionEmbed],
+                                components: [
+                                    new ActionRowBuilder().addComponents(createSectionMenu(selectedSection)),
+                                    new ActionRowBuilder().addComponents(itemMenu)
+                                ],
+                                files: [] // Clear any attachments
+                            });
+                    
+                            // Reset states
+                            selectedItem = null;
+                            selectedMods = [];
+                            currentPage = 0;
+                            itemState = null;
+                    
+                        } catch (error) {
+                            console.error('Error handling back button:', error);
+                            logToFile('Interaction Error', {
+                                error: error.message,
+                                stack: error.stack
+                            });
+                        }
+                    }
                 } catch (error) {
                     console.error('Error in interaction:', error);
                     logShop('Interaction Error', {
@@ -861,6 +907,10 @@ function updateModificationDisplay(interaction, itemData, selectedMods, currentP
         modRows.push(
             new ActionRowBuilder().addComponents(
                 new ButtonBuilder()
+                    .setCustomId('back-to-items')
+                    .setLabel('Zpět')
+                    .setStyle(ButtonStyle.Secondary),
+                new ButtonBuilder()
                     .setCustomId('prev-page')
                     .setLabel('◀️')
                     .setStyle(ButtonStyle.Primary)
@@ -879,6 +929,10 @@ function updateModificationDisplay(interaction, itemData, selectedMods, currentP
     } else {
         modRows.push(
             new ActionRowBuilder().addComponents(
+                new ButtonBuilder()
+                    .setCustomId('back-to-items')
+                    .setLabel('Zpět')
+                    .setStyle(ButtonStyle.Secondary),
                 new ButtonBuilder()
                     .setCustomId('buy-item')
                     .setLabel('Koupit')
@@ -946,6 +1000,10 @@ function createCountableDisplay(itemData, count = 1) {
         components: [
             countMenu,
             new ActionRowBuilder().addComponents(
+                new ButtonBuilder()
+                    .setCustomId('back-to-items')
+                    .setLabel('Zpět')
+                    .setStyle(ButtonStyle.Secondary),
                 new ButtonBuilder()
                     .setCustomId('buy-item')
                     .setLabel('Koupit')
