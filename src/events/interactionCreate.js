@@ -1,5 +1,6 @@
 const { Interaction } = require("discord.js");
 const { handleTradeResponse } = require("../components/handlers/TradeHandler");
+const { handleRoleResponse } = require('../components/handlers/RoleHandler');
 
 module.exports = {
     name: 'interactionCreate',
@@ -30,6 +31,18 @@ module.exports = {
                         await handleTradeResponse(interaction);
                     } catch (error) {
                         console.error('Trade response error:', error);
+                        if (!interaction.replied && !interaction.deferred) {
+                            await interaction.reply({
+                                content: '❌ Nastala chyba při zpracování odpovědi.',
+                                ephemeral: true
+                            });
+                        }
+                    }
+                } else if (['accept-invite', 'decline-invite'].includes(action)) {
+                    try {
+                        await handleRoleResponse(interaction);
+                    } catch (error) {
+                        console.error('Role response error:', error);
                         if (!interaction.replied && !interaction.deferred) {
                             await interaction.reply({
                                 content: '❌ Nastala chyba při zpracování odpovědi.',
