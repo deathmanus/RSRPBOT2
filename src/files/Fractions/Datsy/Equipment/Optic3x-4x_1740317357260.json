@@ -1,0 +1,12 @@
+{
+  "name": "Optika s 3x-4x přiblížením",
+  "type": "countable",
+  "basePrice": 350,
+  "maxCount": 50,
+  "minCount": 1,
+  "description": "Příkaz k nákupu jaké-koliv optiky s 3x-4x přiblížením.",
+  "id": "Optic3x-4x_1740317357260",
+  "addedBy": "_datsy_",
+  "addedDate": "2025-02-23T13:29:17.260Z",
+  "count": 3
+}

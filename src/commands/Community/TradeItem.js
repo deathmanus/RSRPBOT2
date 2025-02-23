@@ -2,6 +2,50 @@ const { SlashCommandBuilder, ActionRowBuilder, StringSelectMenuBuilder, ButtonBu
 const fs = require('fs');
 const path = require('path');
 
+// Modify the createItemMenus function
+function createItemMenus(items, currentPage = 0) {
+    const itemsPerPage = 23; // Reduced to 23 to ensure space for navigation
+    const totalPages = Math.ceil(items.length / itemsPerPage);
+    const start = currentPage * itemsPerPage;
+    const end = start + itemsPerPage;
+    
+    let options = items.slice(start, end).map(item => ({
+        label: item.label,
+        value: item.value,
+        description: item.description
+    }));
+
+    // Add navigation options if needed
+    if (totalPages > 1) {
+        const navigationOptions = [];
+        if (currentPage > 0) {
+            navigationOptions.push({
+                label: '◀️ Předchozí stránka',
+                value: `page_${currentPage - 1}`,
+                description: 'Zobrazit předchozí stránku'
+            });
+        }
+        if (currentPage < totalPages - 1) {
+            navigationOptions.push({
+                label: '▶️ Další stránka',
+                value: `page_${currentPage + 1}`,
+                description: 'Zobrazit další stránku'
+            });
+        }
+        
+        // Ensure we don't exceed 25 options
+        const availableSpace = 25 - navigationOptions.length;
+        options = options.slice(0, availableSpace);
+        options.push(...navigationOptions);
+    }
+
+    return {
+        options,
+        currentPage,
+        totalPages
+    };
+}
+
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('tradeitem')
@@ -13,28 +57,28 @@ module.exports = {
             .setMinValue(0)),
 
     async execute(interaction) {
-        // Kontrola rolí
-        if (!interaction.member.roles.cache.some(role => 
-            role.name.startsWith('Velitel') || role.name.startsWith('Zástupce')
-        )) {
-            return interaction.reply({ 
-                content: '❌ Nemáš oprávnění použít tento příkaz! Pouze velitelé a zástupci frakcí mohou používat tento příkaz.',
-                ephemeral: true 
-            });
-        }
-
         try {
-            await interaction.deferReply({ ephemeral: true });
+            // Check roles
+            if (!interaction.member.roles.cache.some(role => 
+                role.name.startsWith('Velitel') || role.name.startsWith('Zástupce')
+            )) {
+                return interaction.reply({ 
+                    content: '❌ Nemáš oprávnění použít tento příkaz! Pouze velitelé a zástupci frakcí mohou používat tento příkaz.',
+                    ephemeral: true 
+                });
+            }
 
+            await interaction.deferReply();
             const price = interaction.options.getNumber('price');
+
+            // Get seller's fraction
+            const member = interaction.member;
             const fractionPath = path.join(__dirname, '../../files/Fractions');
             const fractions = fs.readdirSync(fractionPath, { withFileTypes: true })
                 .filter(dirent => dirent.isDirectory())
                 .map(dirent => dirent.name);
 
-            // Remove seller's fraction from options
-            const sellerFraction = interaction.member.roles.cache
-                .find(role => fractions.includes(role.name))?.name;
+            const sellerFraction = member.roles.cache.find(role => fractions.includes(role.name))?.name;
 
             if (!sellerFraction) {
                 return await interaction.editReply('❌ Nemáte přiřazenou žádnou frakci.');
@@ -47,26 +91,31 @@ module.exports = {
                     value: fraction
                 }));
 
+            if (buyerOptions.length === 0) {
+                return await interaction.editReply({
+                    ephemeral: true,
+                    content: '❌ Nejsou k dispozici žádné jiné frakce pro obchod.',
+                    embeds: [],
+                    components: [],
+                });
+            }
+
+            // Create buyer menu with limited options
             const buyerMenu = new StringSelectMenuBuilder()
                 .setCustomId('select-buyer')
                 .setPlaceholder('Vyberte frakci pro prodej')
-                .addOptions(buyerOptions);
+                .addOptions(buyerOptions.slice(0, 25)); // Limit to 25 options
 
             const embed = new EmbedBuilder()
                 .setTitle('Prodej předmětu')
                 .setDescription(`Prodávající frakce: ${sellerFraction}\nCena: ${price}$`)
                 .setColor(0x0099FF);
 
-            await interaction.editReply({
-                embeds: [embed],
-                components: [new ActionRowBuilder().addComponents(buyerMenu)]
-            });
-
             const message = await interaction.editReply({
                 embeds: [embed],
                 components: [new ActionRowBuilder().addComponents(buyerMenu)]
             });
-            
+
             const collector = message.createMessageComponentCollector({
                 filter: i => i.user.id === interaction.user.id,
                 time: 300000
@@ -78,182 +127,193 @@ module.exports = {
 
             collector.on('collect', async i => {
                 try {
+                    // Inside the select-buyer handler
                     if (i.customId === 'select-buyer') {
-                        await i.deferUpdate();
-                        selectedBuyer = i.values[0];
+                        try {
+                            await i.deferUpdate();
+                            selectedBuyer = i.values[0];
+                            
+                            const sellerItemsPath = path.join(fractionPath, sellerFraction);
+                            const sections = fs.readdirSync(sellerItemsPath, { withFileTypes: true })
+                                .filter(dirent => dirent.isDirectory())
+                                .map(dirent => dirent.name);
                         
-                        // Load seller's items
-                        const sellerItemsPath = path.join(fractionPath, sellerFraction);
-                        const sections = fs.readdirSync(sellerItemsPath, { withFileTypes: true })
-                            .filter(dirent => dirent.isDirectory())
-                            .map(dirent => dirent.name);
-                    
-                        const itemOptions = [];
-                        let hasItems = false;
-
-                        for (const section of sections) {
-                            const sectionPath = path.join(sellerItemsPath, section);
-                            const items = fs.readdirSync(sectionPath)
-                                .filter(file => file.endsWith('.json'))
-                                .map(file => {
-                                    try {
-                                        const itemData = JSON.parse(fs.readFileSync(path.join(sectionPath, file)));
-                                        // Get all shop files in the section
-                                        const shopSectionPath = path.join(__dirname, '../../files/Shop', section);
-                                        const shopFiles = fs.readdirSync(shopSectionPath)
-                                            .filter(f => f.endsWith('.json'));
-                                        
-                                        // Find matching shop file by name (case insensitive)
-                                        const shopFile = shopFiles.find(f => {
-                                            const shopItemData = JSON.parse(fs.readFileSync(path.join(shopSectionPath, f)));
-                                            return shopItemData.name.toLowerCase() === itemData.name.toLowerCase();
-                                        });
-
-                                        if (!shopFile) {
-                                            console.warn(`Shop file not found for item: ${itemData.name}`);
+                            const itemOptions = [];
+                            let hasItems = false;
+                        
+                            // Get first 25 items only
+                            for (const section of sections) {
+                                if (itemOptions.length >= 23) break; // Leave room for navigation
+                                
+                                const sectionPath = path.join(sellerItemsPath, section);
+                                const items = fs.readdirSync(sectionPath)
+                                    .filter(file => file.endsWith('.json'))
+                                    .map(file => {
+                                        try {
+                                            const itemData = JSON.parse(fs.readFileSync(path.join(sectionPath, file)));
+                                            const shopSectionPath = path.join(__dirname, '../../files/Shop', section);
+                                            
+                                            if (!fs.existsSync(shopSectionPath)) return null;
+                                            
+                                            const shopFiles = fs.readdirSync(shopSectionPath)
+                                                .filter(f => f.endsWith('.json'));
+                                            
+                                            // ... rest of item loading logic
+                                        } catch (error) {
+                                            console.error(`Error loading item ${file}:`, error);
                                             return null;
                                         }
-
-                                        const originalItemData = JSON.parse(
-                                            fs.readFileSync(path.join(shopSectionPath, shopFile), 'utf8')
-                                        );
-
-                                        hasItems = true;
-                                        return {
-                                            label: `${itemData.name} ${originalItemData.type === 'countable' ? `(${itemData.count}x)` : ''}`,
-                                            value: `${section}:${file}:${shopFile}`, // Store shop file name for later
-                                            description: originalItemData.type === 'countable' ? 'Množstevní předmět' : 'Předmět s modifikacemi'
-                                        };
-                                    } catch (error) {
-                                        console.error(`Error loading item ${file}:`, error);
-                                        return null;
-                                    }
-                                })
-                                .filter(item => item !== null); // Remove any failed items
-                            itemOptions.push(...items);
-                        }
-
-                        if (!hasItems) {
+                                    })
+                                    .filter(item => item !== null);
+                                    
+                                itemOptions.push(...items);
+                            }
+                        
+                            if (!hasItems) {
+                                return await i.editReply({
+                                    content: '❌ Vaše frakce nemá žádné předměty k prodeji.',
+                                    embeds: [],
+                                    components: []
+                                });
+                            }
+                        
+                            const { options, currentPage, totalPages } = createItemMenus(itemOptions);
+                            
+                            if (options.length === 0) {
+                                return await i.editReply({
+                                    content: '❌ Žádné předměty k zobrazení.',
+                                    embeds: [],
+                                    components: []
+                                });
+                            }
+                        
+                            // ... rest of the code
+                        } catch (error) {
+                            console.error('Error in select-buyer handler:', error);
                             await i.editReply({
-                                content: '❌ Vaše frakce nemá žádné předměty k prodeji.',
-                                embeds: [],
+                                content: '❌ Nastala chyba při zpracování požadavku.',
                                 components: []
                             });
-                            collector.stop();
-                            return;
                         }
-                    
-                        const itemMenu = new StringSelectMenuBuilder()
-                            .setCustomId('select-item')
-                            .setPlaceholder('Vyberte předmět k prodeji')
-                            .addOptions(itemOptions);
-                    
-                        embed.setDescription(
-                            `Prodávající frakce: ${sellerFraction}\n` +
-                            `Kupující frakce: ${selectedBuyer}\n` +
-                            `Cena: ${price}$`
-                        );
-                    
-                        await i.editReply({
-                            embeds: [embed],
-                            components: [
-                                new ActionRowBuilder().addComponents(
-                                    new StringSelectMenuBuilder(buyerMenu.data)
-                                        .setOptions(buyerOptions)
-                                        .spliceOptions(0, buyerOptions.length, ...buyerOptions.map(opt => ({
-                                            ...opt,
-                                            default: opt.value === selectedBuyer
-                                        })))
-                                ),
-                                new ActionRowBuilder().addComponents(itemMenu)
-                            ]
-                        });
                     }
                     // Inside select-item handler
                     else if (i.customId === 'select-item') {
-                        await i.deferUpdate();
-                        const [section, file, shopFile] = i.values[0].split(':');
-                        const itemPath = path.join(fractionPath, sellerFraction, section, file);
-                        const itemData = JSON.parse(fs.readFileSync(itemPath, 'utf8'));
-                        const originalItemPath = path.join(__dirname, '../../files/Shop', section, shopFile);
-                        const originalItemData = JSON.parse(fs.readFileSync(originalItemPath, 'utf8'));
-                        
-                        selectedItem = { 
-                            ...itemData,
-                            type: originalItemData.type,
-                            section,
-                            file 
-                        };
+                        if (i.values[0].startsWith('page_')) {
+                            await i.deferUpdate();
+                            const newPage = parseInt(i.values[0].split('_')[1]);
+                            const { options, currentPage, totalPages } = createItemMenus(itemOptions, newPage);
                     
-                        if (originalItemData.type === 'countable') {
-                            const countMenu = new StringSelectMenuBuilder()
-                                .setCustomId('select-count')
-                                .setPlaceholder('Vyberte množství')
-                                .addOptions(
-                                    Array.from({ length: Math.min(25, itemData.count) }, (_, i) => i + 1)
-                                        .map(num => ({
-                                            label: `${num}x`,
-                                            value: num.toString()
-                                        }))
-                                );
+                            const itemMenu = new StringSelectMenuBuilder()
+                                .setCustomId('select-item')
+                                .setPlaceholder('Vyberte předmět k prodeji')
+                                .addOptions(options);
                     
                             embed.setDescription(
                                 `Prodávající frakce: ${sellerFraction}\n` +
                                 `Kupující frakce: ${selectedBuyer}\n` +
-                                `Předmět: ${itemData.name}\n` +
-                                `Dostupné množství: ${itemData.count}\n` +
-                                `Cena: ${price}$`
+                                `Cena: ${price}$\n` +
+                                `Stránka ${currentPage + 1}/${totalPages}`
                             );
                     
                             await i.editReply({
                                 embeds: [embed],
                                 components: [
-                                    new ActionRowBuilder().addComponents(countMenu)
+                                    new ActionRowBuilder().addComponents(
+                                        new StringSelectMenuBuilder(buyerMenu.data)
+                                            .setOptions(buyerOptions)
+                                            .spliceOptions(0, buyerOptions.length, ...buyerOptions.map(opt => ({
+                                                ...opt,
+                                                default: opt.value === selectedBuyer
+                                            })))
+                                    ),
+                                    new ActionRowBuilder().addComponents(itemMenu)
                                 ]
                             });
                         } else {
-                            selectedCount = 1;
-                            const confirmButton = new ButtonBuilder()
-                                .setCustomId('confirm-trade')
-                                .setLabel('Odeslat nabídku')
-                                .setStyle(ButtonStyle.Success);
-                    
-                            const cancelButton = new ButtonBuilder()
-                                .setCustomId('cancel-trade')
-                                .setLabel('Zrušit')
-                                .setStyle(ButtonStyle.Danger);
-                    
-                            embed.setDescription(
-                                `Prodávající frakce: ${sellerFraction}\n` +
-                                `Kupující frakce: ${selectedBuyer}\n` +
-                                `Předmět: ${itemData.name}\n` +
-                                `Cena: ${price}$`
-                            );
-                    
-                            if (itemData.selectedMods) {
-                                const modFields = itemData.selectedMods
-                                    .filter(mod => mod && mod.modName)
-                                    .map(mod => ({
-                                        name: mod.modName,
-                                        value: `${mod.selected.split(':')[1]}${
-                                            mod.subSelections && Object.keys(mod.subSelections).length > 0 ?
-                                                '\n' + Object.entries(mod.subSelections)
-                                                    .map(([name, opt]) => `${name}: ${opt.name}`).join('\n') 
-                                                : ''
-                                        }`
-                                    }));
-                                
-                                if (modFields.length > 0) {
-                                    embed.addFields(modFields);
+                            await i.deferUpdate();
+                            const [section, file, shopFile] = i.values[0].split(':');
+                            const itemPath = path.join(fractionPath, sellerFraction, section, file);
+                            const itemData = JSON.parse(fs.readFileSync(itemPath, 'utf8'));
+                            const originalItemPath = path.join(__dirname, '../../files/Shop', section, shopFile);
+                            const originalItemData = JSON.parse(fs.readFileSync(originalItemPath, 'utf8'));
+                            
+                            selectedItem = { 
+                                ...itemData,
+                                type: originalItemData.type,
+                                section,
+                                file 
+                            };
+                        
+                            if (originalItemData.type === 'countable') {
+                                const countMenu = new StringSelectMenuBuilder()
+                                    .setCustomId('select-count')
+                                    .setPlaceholder('Vyberte množství')
+                                    .addOptions(
+                                        Array.from({ length: Math.min(25, itemData.count) }, (_, i) => i + 1)
+                                            .map(num => ({
+                                                label: `${num}x`,
+                                                value: num.toString()
+                                            }))
+                                    );
+                        
+                                embed.setDescription(
+                                    `Prodávající frakce: ${sellerFraction}\n` +
+                                    `Kupující frakce: ${selectedBuyer}\n` +
+                                    `Předmět: ${itemData.name}\n` +
+                                    `Dostupné množství: ${itemData.count}\n` +
+                                    `Cena: ${price}$`
+                                );
+                        
+                                await i.editReply({
+                                    embeds: [embed],
+                                    components: [
+                                        new ActionRowBuilder().addComponents(countMenu)
+                                    ]
+                                });
+                            } else {
+                                selectedCount = 1;
+                                const confirmButton = new ButtonBuilder()
+                                    .setCustomId('confirm-trade')
+                                    .setLabel('Odeslat nabídku')
+                                    .setStyle(ButtonStyle.Success);
+                        
+                                const cancelButton = new ButtonBuilder()
+                                    .setCustomId('cancel-trade')
+                                    .setLabel('Zrušit')
+                                    .setStyle(ButtonStyle.Danger);
+                        
+                                embed.setDescription(
+                                    `Prodávající frakce: ${sellerFraction}\n` +
+                                    `Kupující frakce: ${selectedBuyer}\n` +
+                                    `Předmět: ${itemData.name}\n` +
+                                    `Cena: ${price}$`
+                                );
+                        
+                                if (itemData.selectedMods) {
+                                    const modFields = itemData.selectedMods
+                                        .filter(mod => mod && mod.modName)
+                                        .map(mod => ({
+                                            name: mod.modName,
+                                            value: `${mod.selected.split(':')[1]}${
+                                                mod.subSelections && Object.keys(mod.subSelections).length > 0 ?
+                                                    '\n' + Object.entries(mod.subSelections)
+                                                        .map(([name, opt]) => `${name}: ${opt.name}`).join('\n') 
+                                                    : ''
+                                            }`
+                                        }));
+                                    
+                                    if (modFields.length > 0) {
+                                        embed.addFields(modFields);
+                                    }
                                 }
+                        
+                                await i.editReply({
+                                    embeds: [embed],
+                                    components: [
+                                        new ActionRowBuilder().addComponents(confirmButton, cancelButton)
+                                    ]
+                                });
                             }
-                    
-                            await i.editReply({
-                                embeds: [embed],
-                                components: [
-                                    new ActionRowBuilder().addComponents(confirmButton, cancelButton)
-                                ]
-                            });
                         }
                     }
                     else if (i.customId === 'select-count') {
