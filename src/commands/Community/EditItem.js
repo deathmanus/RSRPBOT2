@@ -11,6 +11,99 @@ const logEdit = (action, data) => {
     console.log('-'.repeat(50));
 };
 
+// Add these functions at the top level
+function createModificationPages(modifications, selectedMods) {
+    const allRows = [];
+
+    Object.entries(modifications).forEach(([modName, modValues], index) => {
+        allRows.push(new ActionRowBuilder().addComponents(
+            new StringSelectMenuBuilder()
+                .setCustomId(`select-mod-${index}`)
+                .setPlaceholder(`Vyberte ${modName}`)
+                .addOptions(modValues.map(opt => ({
+                    label: opt.name,
+                    value: `${modName}:${opt.name}:${opt.price || 0}`,
+                    default: selectedMods[index]?.selected === `${modName}:${opt.name}:${opt.price || 0}`
+                })))
+        ));
+
+        const currentMod = selectedMods[index];
+        if (currentMod?.selected) {
+            const [selectedModName, selectedOptName] = currentMod.selected.split(':');
+            const selectedOption = modValues.find(opt => opt.name === selectedOptName);
+
+            if (selectedOption?.subOptions) {
+                Object.entries(selectedOption.subOptions).forEach(([subName, subValues]) => {
+                    allRows.push(new ActionRowBuilder().addComponents(
+                        new StringSelectMenuBuilder()
+                            .setCustomId(`select-submod-${index}-${subName}`)
+                            .setPlaceholder(`Vyberte ${subName}`)
+                            .addOptions(subValues.map(opt => ({
+                                label: opt.name,
+                                value: `${subName}:${opt.name}:${opt.price || 0}`,
+                                default: currentMod.subSelections?.[subName]?.name === opt.name
+                            })))
+                    ));
+                });
+            }
+        }
+    });
+
+    const pages = [];
+    for (let i = 0; i < allRows.length; i += 4) {
+        pages.push(allRows.slice(i, i + 4));
+    }
+
+    return {
+        pages,
+        totalModifications: allRows.length
+    };
+}
+
+function updateModificationDisplay(itemData, selectedMods, priceDifference, currentPage = 0) {
+    const { pages } = createModificationPages(itemData.modifications, selectedMods);
+    
+    currentPage = Math.max(0, Math.min(pages.length - 1, currentPage));
+    const modRows = [...pages[currentPage]];
+    
+    modRows.push(new ActionRowBuilder().addComponents(
+        ...[
+            pages.length > 1 && new ButtonBuilder()
+                .setCustomId('prev-page')
+                .setLabel('◀️')
+                .setStyle(ButtonStyle.Primary)
+                .setDisabled(currentPage === 0),
+            pages.length > 1 && new ButtonBuilder()
+                .setCustomId('next-page')
+                .setLabel('▶️')
+                .setStyle(ButtonStyle.Primary)
+                .setDisabled(currentPage >= pages.length - 1),
+            new ButtonBuilder()
+                .setCustomId('confirm-edit')
+                .setLabel('Potvrdit')
+                .setStyle(ButtonStyle.Success),
+            new ButtonBuilder()
+                .setCustomId('cancel-edit')
+                .setLabel('Zrušit')
+                .setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder()
+                .setCustomId('sell-item')
+                .setLabel('Prodat')
+                .setStyle(ButtonStyle.Danger)
+        ].filter(Boolean)
+    ));
+
+    const itemEmbed = createItemEmbed(itemData.name, priceDifference, selectedMods);
+    if (pages.length > 1) {
+        itemEmbed.setFooter({ text: `Stránka ${currentPage + 1}/${pages.length}` });
+    }
+
+    return {
+        embeds: [itemEmbed],
+        components: modRows
+    };
+}
+
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('edititem')
@@ -62,6 +155,7 @@ module.exports = {
             let originalItem = null;
             let selectedMods = [];
             let priceDifference = 0;
+            let currentPage = 0;
 
             // Create section menu
             const sectionMenu = new StringSelectMenuBuilder()
@@ -127,42 +221,32 @@ module.exports = {
                             ]
                         });
                     }
+                    // Update the select-item handler
                     else if (i.customId === 'select-item') {
                         const itemPath = path.join(fractionPath, selectedSection, i.values[0]);
                         originalItem = JSON.parse(fs.readFileSync(itemPath));
                         selectedItem = i.values[0];
 
-                        // Load shop item data for modifications
                         const shopItemPath = path.join(__dirname, '../../files/Shop', selectedSection, `${originalItem.name}.json`);
                         const shopItem = JSON.parse(fs.readFileSync(shopItemPath));
 
-                        // Initialize modifications with current values
-                        selectedMods = JSON.parse(JSON.stringify(originalItem.selectedMods)); // Deep clone
+                        selectedMods = JSON.parse(JSON.stringify(originalItem.selectedMods));
                         priceDifference = calculatePriceDifference(originalItem.selectedMods, selectedMods);
 
-                        const modRows = createModificationRows(shopItem.modifications, selectedMods);
-                        modRows.push(new ActionRowBuilder()
-                            .addComponents(
-                                new ButtonBuilder()
-                                    .setCustomId('confirm-edit')
-                                    .setLabel('Potvrdit')
-                                    .setStyle(ButtonStyle.Success),
-                                new ButtonBuilder()
-                                    .setCustomId('cancel-edit')
-                                    .setLabel('Zrušit')
-                                    .setStyle(ButtonStyle.Secondary),
-                                new ButtonBuilder()
-                                    .setCustomId('sell-item')
-                                    .setLabel('Prodat')
-                                    .setStyle(ButtonStyle.Danger)
-                            ));
-
-                        const itemEmbed = createItemEmbed(originalItem.name, priceDifference, selectedMods);
-                        await i.editReply({
-                            embeds: [itemEmbed],
-                            components: modRows
-                        });
+                        const display = updateModificationDisplay(shopItem, selectedMods, priceDifference, 0);
+                        await i.editReply(display);
                     }
+                    // Add page navigation handler
+                    else if (i.customId === 'prev-page' || i.customId === 'next-page') {
+                        currentPage += i.customId === 'next-page' ? 1 : -1;
+                        
+                        const shopItemPath = path.join(__dirname, '../../files/Shop', selectedSection, `${originalItem.name}.json`);
+                        const shopItem = JSON.parse(fs.readFileSync(shopItemPath));
+                        
+                        const display = updateModificationDisplay(shopItem, selectedMods, priceDifference, currentPage);
+                        await i.editReply(display);
+                    }
+                    // Update the select-mod handler
                     else if (i.customId.startsWith('select-mod-')) {
                         const modIndex = parseInt(i.customId.split('-')[2], 10);
                         const [modName, optName, optPrice] = i.values[0].split(':');
@@ -209,29 +293,10 @@ module.exports = {
                         // Calculate new price difference
                         priceDifference = calculatePriceDifference(originalItem.selectedMods, selectedMods);
                     
-                        const modRows = createModificationRows(shopItem.modifications, selectedMods);
-                        modRows.push(new ActionRowBuilder()
-                            .addComponents(
-                                new ButtonBuilder()
-                                    .setCustomId('confirm-edit')
-                                    .setLabel('Potvrdit')
-                                    .setStyle(ButtonStyle.Success),
-                                new ButtonBuilder()
-                                    .setCustomId('cancel-edit')
-                                    .setLabel('Zrušit')
-                                    .setStyle(ButtonStyle.Secondary),
-                                new ButtonBuilder()
-                                    .setCustomId('sell-item')
-                                    .setLabel('Prodat')
-                                    .setStyle(ButtonStyle.Danger)
-                            ));
-
-                        const itemEmbed = createItemEmbed(originalItem.name, priceDifference, selectedMods);
-                        await i.editReply({
-                            embeds: [itemEmbed],
-                            components: modRows
-                        });
+                        const display = updateModificationDisplay(shopItem, selectedMods, priceDifference, currentPage);
+                        await i.editReply(display);
                     }
+                    // Update the select-submod handler
                     else if (i.customId.startsWith('select-submod-')) {
                         const parts = i.customId.split('-');
                         const modIndex = parseInt(parts[2], 10);
@@ -262,28 +327,8 @@ module.exports = {
                         // Calculate new price difference immediately
                         priceDifference = calculatePriceDifference(originalItem.selectedMods, selectedMods);
                     
-                        const modRows = createModificationRows(shopItem.modifications, selectedMods);
-                        modRows.push(new ActionRowBuilder()
-                            .addComponents(
-                                new ButtonBuilder()
-                                    .setCustomId('confirm-edit')
-                                    .setLabel('Potvrdit')
-                                    .setStyle(ButtonStyle.Success),
-                                new ButtonBuilder()
-                                    .setCustomId('cancel-edit')
-                                    .setLabel('Zrušit')
-                                    .setStyle(ButtonStyle.Secondary),
-                                new ButtonBuilder()
-                                    .setCustomId('sell-item')
-                                    .setLabel('Prodat')
-                                    .setStyle(ButtonStyle.Danger)
-                            ));
-
-                        const itemEmbed = createItemEmbed(originalItem.name, priceDifference, selectedMods);
-                        await i.editReply({
-                            embeds: [itemEmbed],
-                            components: modRows
-                        });
+                        const display = updateModificationDisplay(shopItem, selectedMods, priceDifference, currentPage);
+                        await i.editReply(display);
                     }
                     else if (i.customId === 'confirm-edit') {
                         if (priceDifference > 0 && fractionData.money < priceDifference) {
