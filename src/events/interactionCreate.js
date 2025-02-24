@@ -1,7 +1,9 @@
-const { Interaction } = require("discord.js");
+const { Interaction, EmbedBuilder } = require("discord.js");
 const { handleTradeResponse } = require("../components/handlers/TradeHandler");
 const { handleRoleResponse } = require('../components/handlers/RoleHandler');
 const TicketHandler = require('../components/handlers/TicketHandler');
+
+const logChannelId = '1213225816201240587';
 
 module.exports = {
     name: 'interactionCreate',
@@ -9,6 +11,15 @@ module.exports = {
         try {
             // Handle commands
             if (interaction.isCommand()) {
+                // Log the command usage
+                const logChannel = interaction.guild.channels.cache.get(logChannelId);
+                const embed = new EmbedBuilder()
+                    .setTitle('Command log')
+                    .setDescription('User: ' + `<@${interaction.user.id}>, id - ${interaction.user.id}\n`+ 'Command: ' + interaction.commandName)
+                    .setColor(2);
+                await logChannel.send({ embeds: [embed] });
+
+                // Execute the command
                 const command = client.commands.get(interaction.commandName);
                 if (!command) return;
 

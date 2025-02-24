@@ -1,15 +1,7 @@
 const { SlashCommandBuilder, ActionRowBuilder, StringSelectMenuBuilder, EmbedBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const { ShopSystem, ShopLogger } = require('../../systems/shopSystem');
 const fs = require('fs');
 const path = require('path');
-
-// Helper function for logging with timestamps
-const logShop = (action, data) => {
-    const timestamp = new Date().toISOString();
-    console.log(`\n[SHOP LOG - ${timestamp}]`);
-    console.log(`Action: ${action}`);
-    console.log('Data:', JSON.stringify(data, null, 2));
-    console.log('-'.repeat(50));
-};
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -17,7 +9,7 @@ module.exports = {
         .setDescription('Procházet obchod a vybírat položky k nákupu.'),
     async execute(interaction) {
         try {
-            logShop('Command Started', {
+            ShopLogger.log('Command Started', {
                 user: interaction.user.tag,
                 userId: interaction.user.id,
                 channel: interaction.channel.name,
@@ -31,10 +23,10 @@ module.exports = {
                 .filter(dirent => dirent.isDirectory())
                 .map(dirent => dirent.name);
 
-            logShop('Loaded Shop Sections', { sections });
+            ShopLogger.log('Loaded Shop Sections', { sections });
 
             if (sections.length === 0) {
-                logShop('Error', 'No shop sections available');
+                ShopLogger.log('Error', 'No shop sections available');
                 return await interaction.followUp({ content: '❌ Žádné sekce obchodu k zobrazení.', flags: 64 });
             }
 
@@ -65,7 +57,7 @@ module.exports = {
                 components: [row]
             });
 
-            logShop('Initial Shop Menu Created', {
+            ShopLogger.log('Initial Shop Menu Created', {
                 type: 'section_select',
                 available_sections: sections
             });
@@ -81,24 +73,17 @@ module.exports = {
 
                     if (i.customId === 'select-shop-section') {
                         selectedSection = i.values[0];
-                        logShop('Section Selected', { selectedSection });
+                        ShopLogger.log('Section Selected', { selectedSection });
 
-                        const sectionDir = path.join(shopDir, selectedSection);
-                        const items = fs.readdirSync(sectionDir, { withFileTypes: true })
-                            .filter(dirent => dirent.isFile() && dirent.name.endsWith('.json'))
-                            .map(dirent => dirent.name.replace('.json', ''));
-
-                        logShop('Items Loaded', { 
-                            section: selectedSection,
-                            availableItems: items 
-                        });
-
+                        // Použití nového systému pro načtení sekce
+                        const items = await ShopSystem.loadSection(selectedSection);
+                        
                         const itemMenu = new StringSelectMenuBuilder()
                             .setCustomId('select-shop-item')
                             .setPlaceholder('Vyberte položku k zobrazení')
                             .addOptions(items.map(item => ({
-                                label: item,
-                                value: item
+                                label: item.name,
+                                value: item.filename.replace('.json', '')
                             })));
 
                         const sectionEmbed = new EmbedBuilder()
@@ -118,6 +103,20 @@ module.exports = {
                         selectedItem = i.values[0];
                         const itemPath = path.join(shopDir, selectedSection, `${selectedItem}.json`);
                         const itemData = JSON.parse(fs.readFileSync(itemPath, 'utf8'));
+                        
+                        // Validace položky
+                        const validationErrors = ShopSystem.validateItem(itemData);
+                        if (validationErrors.length > 0) {
+                            ShopLogger.log('Validation Error', {
+                                item: selectedItem,
+                                errors: validationErrors
+                            });
+                            await i.editReply({
+                                content: '❌ Tato položka obsahuje chyby v datech a není momentálně dostupná.',
+                                components: []
+                            });
+                            return;
+                        }
 
                         switch (itemData.type) {
                             case 'countable':
@@ -203,7 +202,7 @@ module.exports = {
                         const subModName = parts[3];  // Changed from parts[2]
                         const [subMod, optName, optPrice] = i.values[0].split(':');
                     
-                        logShop('Sub-Modification Attempt', {
+                        ShopLogger.log('Sub-Modification Attempt', {
                             modIndex,
                             subModName,
                             subMod,
@@ -218,7 +217,7 @@ module.exports = {
                     
                         // Validate modIndex
                         if (typeof modIndex !== 'number' || !selectedMods[modIndex]) {
-                            logShop('Error', {
+                            ShopLogger.log('Error', {
                                 message: 'Invalid modification index',
                                 modIndex,
                                 selectedMods
@@ -234,7 +233,7 @@ module.exports = {
                     
                         // Validate sub-modification exists
                         if (!selectedMainOpt?.subOptions?.[subMod]) {
-                            logShop('Error', {
+                            ShopLogger.log('Error', {
                                 message: 'Invalid sub-modification',
                                 mainModName,
                                 mainOptName,
@@ -247,7 +246,7 @@ module.exports = {
                         // Find the selected sub-option
                         const subOpt = selectedMainOpt.subOptions[subMod].find(opt => opt.name === optName);
                         if (!subOpt) {
-                            logShop('Error', {
+                            ShopLogger.log('Error', {
                                 message: 'Sub-option not found',
                                 subMod,
                                 optName,
@@ -262,7 +261,7 @@ module.exports = {
                             price: Number(subOpt.price) || 0
                         };
                     
-                        logShop('Sub-Modification Selected', {
+                        ShopLogger.log('Sub-Modification Selected', {
                             modIndex,
                             mainMod: mainModName,
                             subModName: subMod,
@@ -560,7 +559,7 @@ module.exports = {
                                         // Send confirmation to channel
                                         await interaction.channel.send({ embeds: [purchaseEmbed] });
                             
-                                        logShop('Purchase Completed', {
+                                        ShopLogger.log('Purchase Completed', {
                                             itemId: uniqueId,
                                             buyer: interaction.user.tag,
                                             fraction: fractionRole.name,
@@ -615,7 +614,7 @@ module.exports = {
                     
                         } catch (error) {
                             console.error('Error in buy-item:', error);
-                            logShop('Purchase Error', {
+                            ShopLogger.log('Purchase Error', {
                                 error: error.message,
                                 stack: error.stack
                             });
@@ -675,7 +674,8 @@ module.exports = {
                     }
                 } catch (error) {
                     console.error('Error in interaction:', error);
-                    logShop('Interaction Error', {
+                    ShopLogger.log('Error', {
+                        action: 'collector',
                         error: error.message,
                         stack: error.stack
                     });
@@ -690,7 +690,7 @@ module.exports = {
 
             // ... rest of your code (collector end handler, etc.)
             collector.on('end', async (collected, reason) => {
-                logShop('Collector Ended', {
+                ShopLogger.log('Collector Ended', {
                     reason,
                     interactionsCollected: collected.size
                 });
@@ -708,7 +708,7 @@ module.exports = {
                         }).catch(() => {});
                     } catch (error) {
                         console.error('Error in collector end:', error);
-                        logShop('Timeout Error', {
+                        ShopLogger.log('Timeout Error', {
                             error: error.message,
                             stack: error.stack
                         });
@@ -718,7 +718,7 @@ module.exports = {
 
         } catch (error) {
             console.error('Error in shop command:', error);
-            logShop('Command Error', {
+            ShopLogger.log('Command Error', {
                 error: error.message,
                 stack: error.stack
             });
