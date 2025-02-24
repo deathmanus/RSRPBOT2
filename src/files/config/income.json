@@ -1,0 +1,5 @@
+{
+  "paymentTime": "0 0 * * *",
+  "defaultCurrency": "money",
+  "historyRetention": 30
+}

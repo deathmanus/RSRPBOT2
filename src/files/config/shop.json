@@ -1,0 +1,5 @@
+{
+  "cacheTimeout": 300000,
+  "maxItemsPerPage": 25,
+  "defaultCurrency": "money"
+}

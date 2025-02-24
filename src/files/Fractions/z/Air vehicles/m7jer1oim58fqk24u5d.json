@@ -1,0 +1,30 @@
+{
+  "id": "m7jer1oim58fqk24u5d",
+  "name": "CH-47D Chinook",
+  "basePrice": 11800,
+  "selectedMods": [
+    {
+      "modName": "Camo",
+      "selected": "Camo:Aircraft Green:0",
+      "subSelections": {}
+    },
+    {
+      "modName": "Config",
+      "selected": "Config:Stock:0",
+      "subSelections": {}
+    },
+    {
+      "modName": "GunRight",
+      "selected": "GunRight:No weapon:0",
+      "subSelections": {}
+    },
+    {
+      "modName": "GunLeft",
+      "selected": "GunLeft:No weapon:0",
+      "subSelections": {}
+    }
+  ],
+  "totalPrice": 11800,
+  "purchaseDate": "2025-02-24T18:45:20.322Z",
+  "buyer": "death_man"
+}
