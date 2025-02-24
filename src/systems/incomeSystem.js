@@ -1,6 +1,7 @@
 const { scheduleJob } = require('node-schedule');
 const fs = require('fs');
 const path = require('path');
+const { getEmoji } = require('../utils/emojiUtils');
 
 const INCOME_FILE = path.join(__dirname, '../files/Income/income-config.json');
 const LAST_RUN_FILE = path.join(__dirname, '../files/Income/last-run.json');
@@ -63,13 +64,13 @@ class IncomeSystem {
                 await this.distributeIncome(diffDays);
             }
         } catch (error) {
-            console.error('❌ Error checking missed payments:', error);
+            console.error(`${getEmoji('error')} Error checking missed payments:`, error);
         }
     }
 
     async distributeIncome(multiplier = 1) {
         try {
-            console.log('🔄 Starting income distribution...');
+            console.log(`${getEmoji('money')} Starting income distribution...`);
             
             // Wait for client to be ready with timeout
             let attempts = 0;
@@ -95,7 +96,7 @@ class IncomeSystem {
             const fractions = fs.readdirSync(fractionsDir)
                 .filter(f => fs.statSync(path.join(fractionsDir, f)).isDirectory());
 
-            console.log(`📁 Processing ${fractions.length} fractions...`);
+            console.log(`${getEmoji('folder')} Processing ${fractions.length} fractions...`);
 
             // Force fetch all guild members first
             await guild.members.fetch();
@@ -104,7 +105,7 @@ class IncomeSystem {
                 try {
                     const fractionFile = path.join(fractionsDir, fraction, `${fraction}.json`);
                     if (!fs.existsSync(fractionFile)) {
-                        console.log(`⚠️ No config for fraction: ${fraction}`);
+                        console.log(`${getEmoji('error')} No config for fraction: ${fraction}`);
                         continue;
                     }
 
@@ -113,17 +114,17 @@ class IncomeSystem {
                     // Force fetch the role and its members
                     const fractionRole = await guild.roles.fetch(fractionData.fractionRoleId);
                     if (!fractionRole) {
-                        console.log(`⚠️ Role not found: ${fractionData.fractionRoleId}`);
+                        console.log(`${getEmoji('error')} Role not found: ${fractionData.fractionRoleId}`);
                         continue;
                     }
 
                     const fractionMembers = fractionRole.members;
                     if (!fractionMembers || fractionMembers.size === 0) {
-                        console.log(`⚠️ No members found in fraction: ${fraction}`);
+                        console.log(`${getEmoji('error')} No members found in fraction: ${fraction}`);
                         continue;
                     }
 
-                    console.log(`👥 Processing ${fractionMembers.size} members in ${fraction}`);
+                    console.log(`${getEmoji('members')} Processing ${fractionMembers.size} members in ${fraction}`);
                     
                     let totalIncome = 0;
 
@@ -132,7 +133,7 @@ class IncomeSystem {
                         for (const incomeRole of config.roles) {
                             if (member.roles.cache.has(incomeRole.roleId)) {
                                 totalIncome += incomeRole.dailyIncome;
-                                console.log(`💰 ${member.user.tag} +${incomeRole.dailyIncome}`);
+                                console.log(`${getEmoji('money')} ${member.user.tag} +${incomeRole.dailyIncome}`);
                             }
                         }
                     }
@@ -141,10 +142,10 @@ class IncomeSystem {
                         const finalIncome = totalIncome * multiplier;
                         fractionData.money = (fractionData.money || 0) + finalIncome;
                         fs.writeFileSync(fractionFile, JSON.stringify(fractionData, null, 2));
-                        console.log(`✅ Added ${finalIncome} to ${fraction}`);
+                        console.log(`${getEmoji('success')} Added ${finalIncome} to ${fraction}`);
                     }
                 } catch (fractionError) {
-                    console.error(`❌ Error processing ${fraction}:`, fractionError);
+                    console.error(`${getEmoji('error')} Error processing ${fraction}:`, fractionError);
                 }
             }
 
@@ -153,10 +154,10 @@ class IncomeSystem {
                 lastIncomeDate: new Date().toISOString()
             }, null, 2));
 
-            console.log('✅ Income distribution completed');
+            console.log(`${getEmoji('success')} Income distribution completed`);
 
         } catch (error) {
-            console.error('❌ Fatal error:', error);
+            console.error(`${getEmoji('error')} Fatal error:`, error);
         }
     }
 }

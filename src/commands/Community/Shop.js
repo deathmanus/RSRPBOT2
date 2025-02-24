@@ -1,5 +1,6 @@
 const { SlashCommandBuilder, ActionRowBuilder, StringSelectMenuBuilder, EmbedBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const { ShopSystem, ShopLogger } = require('../../systems/shopSystem');
+const { getEmoji } = require('../../utils/emojiUtils');
 const fs = require('fs');
 const path = require('path');
 
@@ -395,14 +396,14 @@ module.exports = {
                             // Vytvoření potvrzovacího embedu
                             const confirmEmbed = new EmbedBuilder()
                                 .setColor(0xFFAA00)
-                                .setTitle('🛍️ Potvrzení nákupu')
+                                .setTitle(`${getEmoji('store')} Potvrzení nákupu`)
                                 .setDescription(`**Opravdu chcete koupit tento předmět?**`)
                                 .addFields(
                                     { name: 'Položka', value: name, inline: true },
                                     { name: 'Sekce', value: selectedSection, inline: true },
-                                    { name: 'Celková cena', value: `${totalPrice} $`, inline: true },
+                                    { name: 'Celková cena', value: `${totalPrice} ${getEmoji('money')}`, inline: true },
                                     { name: 'Vybrané možnosti', value: selectedOptions.length > 0 ? selectedOptions.join('\n') : 'Žádné možnosti' },
-                                    { name: 'Stav účtu frakce', value: `Současný: ${fractionData.money}$\nPo nákupu: ${fractionData.money - totalPrice}$` }
+                                    { name: 'Stav účtu frakce', value: `Současný: ${fractionData.money}${getEmoji('money')}\nPo nákupu: ${fractionData.money - totalPrice}${getEmoji('money')}` }
                                 );
                     
                             const confirmRow = new ActionRowBuilder()
@@ -512,12 +513,12 @@ module.exports = {
                                         // Create purchase confirmation embed with updated information
                                         const purchaseEmbed = new EmbedBuilder()
                                             .setColor(0x00FF00)
-                                            .setTitle('✅ Nákup dokončen')
+                                            .setTitle(`${getEmoji('success')} Nákup dokončen`)
                                             .setDescription(`**${interaction.user.tag}** zakoupil/a pro frakci **${fractionRole.name}**:`)
                                             .addFields(
                                                 { name: 'Položka', value: name, inline: true },
                                                 { name: 'Sekce', value: selectedSection, inline: true },
-                                                { name: 'Celková cena', value: `${totalPrice} $`, inline: true }
+                                                { name: 'Celková cena', value: `${totalPrice} ${getEmoji('money')}`, inline: true }
                                             );
                             
                                         // Add type-specific fields
@@ -533,7 +534,7 @@ module.exports = {
                                         }
                             
                                         purchaseEmbed.addFields(
-                                            { name: 'Nový stav účtu', value: `${fractionData.money} $` },
+                                            { name: 'Nový stav účtu', value: `${fractionData.money} ${getEmoji('money')}` },
                                             { name: 'ID předmětu', value: purchaseData.id }
                                         ).setTimestamp();
                             
@@ -739,8 +740,8 @@ function calculateTotalPrice(basePrice, selectedMods) {
 function createItemEmbed(name, basePrice, totalPrice, selectedMods) {
     return new EmbedBuilder()
         .setColor(0x00FF00)
-        .setTitle(name)
-        .setDescription(`Základní cena: ${basePrice} $`)
+        .setTitle(`${getEmoji('store')} ${name}`)
+        .setDescription(`Základní cena: ${basePrice} ${getEmoji('money')}`)
         .addFields(selectedMods.map(mod => ({
             name: mod.modName,
             value: `${mod.selected.split(':')[1]}${
@@ -750,7 +751,7 @@ function createItemEmbed(name, basePrice, totalPrice, selectedMods) {
             }`,
             inline: true
         })))
-        .addFields({ name: 'Celková cena', value: `${totalPrice} $`, inline: true });
+        .addFields({ name: 'Celková cena', value: `${totalPrice} ${getEmoji('money')}`, inline: true });
 }
 
 function createModificationRows(modifications, selectedMods) {
@@ -961,7 +962,7 @@ function createCountableDisplay(itemData, count = 1) {
                     { length: endCount - startCount + 1 }, 
                     (_, i) => i + startCount
                 ).map(num => ({
-                    label: `${num}x (${num * basePrice}$)`,
+                    label: `${num}x (${num * basePrice}${getEmoji('money')})`,
                     value: num.toString(),
                     default: num === count
                 }))
@@ -970,12 +971,12 @@ function createCountableDisplay(itemData, count = 1) {
 
     const embed = new EmbedBuilder()
         .setColor(0x00FF00)
-        .setTitle(name)
+        .setTitle(`${getEmoji('store')} ${name}`)
         .setDescription(description || '')
         .addFields(
-            { name: 'Cena za kus', value: `${basePrice} $`, inline: true },
+            { name: 'Cena za kus', value: `${basePrice} ${getEmoji('money')}`, inline: true },
             { name: 'Množství', value: count.toString(), inline: true },
-            { name: 'Celková cena', value: `${totalPrice} $`, inline: true },
+            { name: 'Celková cena', value: `${totalPrice} ${getEmoji('money')}`, inline: true },
             { 
                 name: 'Limity', 
                 value: `Minimum: ${minCount} ks\nMaximum: ${maxCount} ks`, 

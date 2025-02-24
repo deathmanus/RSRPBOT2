@@ -1,4 +1,5 @@
 const { SlashCommandBuilder, ActionRowBuilder, StringSelectMenuBuilder, EmbedBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const { getEmoji } = require('../../utils/emojiUtils');
 const fs = require('fs');
 const path = require('path');
 
@@ -115,7 +116,7 @@ module.exports = {
             role.name.startsWith('Velitel') || role.name.startsWith('Zástupce')
         )) {
             return interaction.reply({ 
-                content: '❌ Nemáš oprávnění použít tento příkaz! Pouze velitelé a zástupci frakcí mohou používat tento příkaz.',
+                content: `${getEmoji('error')} Nemáš oprávnění použít tento příkaz! Pouze velitelé a zástupci frakcí mohou používat tento příkaz.`,
                 ephemeral: true 
             });
         }
@@ -130,7 +131,7 @@ module.exports = {
 
             if (!fractionRole) {
                 return await interaction.editReply({
-                    content: '❌ Nejste členem žádné frakce.',
+                    content: `${getEmoji('error')} Nejste členem žádné frakce.`,
                     components: []
                 });
             }
@@ -145,7 +146,7 @@ module.exports = {
 
             if (sections.length === 0) {
                 return await interaction.editReply({
-                    content: '❌ Vaše frakce nemá žádné předměty.',
+                    content: `${getEmoji('error')} Vaše frakce nemá žádné předměty.`,
                     components: []
                 });
             }
@@ -333,7 +334,7 @@ module.exports = {
                     else if (i.customId === 'confirm-edit') {
                         if (priceDifference > 0 && fractionData.money < priceDifference) {
                             return await i.editReply({
-                                content: `❌ Nedostatek peněz pro úpravu. Potřebujete: ${priceDifference}$`,
+                                content: `${getEmoji('error')} Nedostatek peněz pro úpravu. Potřebujete: ${priceDifference}$`,
                                 components: []
                             });
                         }
@@ -357,7 +358,7 @@ module.exports = {
                         // Send confirmation message
                         const confirmEmbed = new EmbedBuilder()
                             .setColor(0x00FF00)
-                            .setTitle('✅ Předmět upraven')
+                            .setTitle(`${getEmoji('success')} Předmět upraven`)
                             .addFields(
                                 { name: 'Předmět', value: originalItem.name },
                                 { name: 'Cenový rozdíl', value: `${priceDifference}$` },
@@ -366,7 +367,7 @@ module.exports = {
 
                         await interaction.channel.send({ embeds: [confirmEmbed] });
                         await i.editReply({
-                            content: '✅ Úpravy byly uloženy',
+                            content: `${getEmoji('success')} Úpravy byly uloženy`,
                             components: [],
                             embeds: []
                         });
@@ -375,7 +376,7 @@ module.exports = {
                         const sellPrice = Math.floor(originalItem.totalPrice * 0.9);
                         const confirmSell = new EmbedBuilder()
                             .setColor(0xFF0000)
-                            .setTitle('🚨 Potvrzení prodeje')
+                            .setTitle(`${getEmoji('warning')} Potvrzení prodeje`)
                             .setDescription(`Opravdu chcete prodat ${originalItem.name} za ${sellPrice}$?`);
 
                         const confirmButtons = new ActionRowBuilder()
@@ -422,7 +423,7 @@ module.exports = {
                         // Send confirmation
                         const sellEmbed = new EmbedBuilder()
                             .setColor(0x00FF00)
-                            .setTitle('💰 Předmět prodán')
+                            .setTitle(`${getEmoji('success')} Předmět prodán`)
                             .addFields(
                                 { name: 'Předmět', value: originalItem.name },
                                 { name: 'Získáno', value: `${sellPrice}$` },
@@ -431,14 +432,14 @@ module.exports = {
 
                         await interaction.channel.send({ embeds: [sellEmbed] });
                         await i.editReply({
-                            content: '✅ Předmět byl prodán',
+                            content: `${getEmoji('success')} Předmět byl prodán`,
                             components: [],
                             embeds: []
                         });
                     }
                     else if (i.customId === 'cancel-sell' || i.customId === 'cancel-edit') {
                         await i.editReply({
-                            content: '❌ Akce zrušena',
+                            content: `${getEmoji('error')} Akce zrušena`,
                             components: [],
                             embeds: []
                         });
@@ -446,7 +447,7 @@ module.exports = {
                 } catch (error) {
                     console.error(error);
                     await i.editReply({
-                        content: '❌ Nastala chyba při zpracování akce',
+                        content: `${getEmoji('error')} Nastala chyba při zpracování akce`,
                         components: []
                     });
                 }
@@ -465,7 +466,7 @@ module.exports = {
         } catch (error) {
             console.error(error);
             await interaction.editReply({
-                content: '❌ Nastala chyba při zpracování příkazu',
+                content: `${getEmoji('error')} Nastala chyba při zpracování příkazu`,
                 components: []
             });
         }
@@ -517,19 +518,20 @@ function createItemEmbed(name, priceDifference, selectedMods) {
 
     const embed = new EmbedBuilder()
         .setColor(priceDifference > 0 ? 0xFF0000 : priceDifference < 0 ? 0x00FF00 : 0xFFFFFF)
-        .setTitle(`Úprava: ${name}`)
+        .setTitle(`${getEmoji('edit')} Úprava: ${name}`)
         .setDescription(priceDifference === 0 ? 
             '✨ Žádné cenové změny' : 
             priceDifference > 0 ?
-                `💸 Doplatek: ${priceDifference} $` :
-                `💰 Vrácení: ${Math.abs(priceDifference)} $`
+                `${getEmoji('money')} Doplatek: ${priceDifference} ${getEmoji('money')}` :
+                `${getEmoji('money')} Vrácení: ${Math.abs(priceDifference)} ${getEmoji('money')}`
         )
         .addFields(selectedMods.map(mod => ({
             name: mod.modName,
             value: `${mod.selected.split(':')[1]}${
                 mod.subSelections && Object.keys(mod.subSelections).length > 0 ?
                     '\n' + Object.entries(mod.subSelections)
-                        .map(([name, opt]) => `  ${name}: ${opt.name} ${opt.price > 0 ? `(${opt.price} $)` : ''}`).join('\n') : ''
+                        .map(([name, opt]) => `${name}: ${opt.name}`).join('\n') 
+                    : ''
             }`,
             inline: true
         })));
@@ -538,8 +540,8 @@ function createItemEmbed(name, priceDifference, selectedMods) {
     if (priceDifference !== 0) {
         embed.setFooter({ 
             text: priceDifference > 0 ? 
-                '❗ Tato úprava bude stát více peněz' : 
-                '✅ Za tuto úpravu dostanete peníze zpět'
+                `${getEmoji('error')} Tato úprava bude stát více peněz` : 
+                `${getEmoji('success')} Za tuto úpravu dostanete peníze zpět`
         });
     }
 

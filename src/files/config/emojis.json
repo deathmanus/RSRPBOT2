@@ -1,0 +1,31 @@
+{
+  "money": "<:money:1228011308696338543>",
+  "store": "🛍️",
+  "inventory": "🎒",
+  "ticket": "🎫",
+  "fraction": "⚔️",
+  "leader": "👑",
+  "deputy": "🎖️",
+  "member": "👤",
+  "members": "👥",
+  "stats": "📊",
+  "roles": "🎭",
+  "trade": "🤝",
+  "info": "ℹ️",
+  "warns": "⚠️",
+  "success": "✅",
+  "error": "❌",
+  "edit": "✏️",
+  "color": "🎨",
+  "image": "🖼️",
+  "dates": "📅",
+  "channel": "💬",
+  "backup": "📤",
+  "folder": "📁",
+  "categories": {
+    "air_vehicles": "🚁",
+    "ground_vehicles": "🚗",
+    "equipment": "🎖️",
+    "resources": "📦"
+  }
+}

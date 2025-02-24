@@ -1,44 +1,30 @@
 const { SlashCommandBuilder, ActionRowBuilder, StringSelectMenuBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require('discord.js');
+const { getEmoji } = require('../../utils/emojiUtils');
 const fs = require('fs');
 const path = require('path');
 
 // Modify the createItemMenus function
 function createItemMenus(items, currentPage = 0) {
-    const itemsPerPage = 23; // Reduced to 23 to ensure space for navigation
+    const itemsPerPage = 24;
     const totalPages = Math.ceil(items.length / itemsPerPage);
-    const start = currentPage * itemsPerPage;
-    const end = start + itemsPerPage;
+    currentPage = Math.max(0, Math.min(currentPage, totalPages - 1));
     
-    let options = items.slice(start, end).map(item => ({
-        label: item.label,
-        value: item.value,
-        description: item.description
-    }));
-
-    // Add navigation options if needed
+    const startIdx = currentPage * itemsPerPage;
+    const endIdx = startIdx + itemsPerPage;
+    
+    let options = [];
+    
     if (totalPages > 1) {
-        const navigationOptions = [];
-        if (currentPage > 0) {
-            navigationOptions.push({
-                label: '◀️ Předchozí stránka',
-                value: `page_${currentPage - 1}`,
-                description: 'Zobrazit předchozí stránku'
-            });
-        }
-        if (currentPage < totalPages - 1) {
-            navigationOptions.push({
-                label: '▶️ Další stránka',
-                value: `page_${currentPage + 1}`,
-                description: 'Zobrazit další stránku'
-            });
-        }
-        
-        // Ensure we don't exceed 25 options
-        const availableSpace = 25 - navigationOptions.length;
-        options = options.slice(0, availableSpace);
-        options.push(...navigationOptions);
+        options.push({
+            label: `Stránka ${currentPage + 1}/${totalPages}`,
+            value: `page_${currentPage}`,
+            description: `Aktuální stránka`,
+            default: true
+        });
     }
-
+    
+    options = options.concat(items.slice(startIdx, endIdx));
+    
     return {
         options,
         currentPage,
@@ -63,7 +49,7 @@ module.exports = {
                 role.name.startsWith('Velitel') || role.name.startsWith('Zástupce')
             )) {
                 return interaction.reply({ 
-                    content: '❌ Nemáš oprávnění použít tento příkaz! Pouze velitelé a zástupci frakcí mohou používat tento příkaz.',
+                    content: `${getEmoji('error')} Nemáš oprávnění použít tento příkaz! Pouze velitelé a zástupci frakcí mohou používat tento příkaz.`,
                     ephemeral: true 
                 });
             }
@@ -81,7 +67,7 @@ module.exports = {
             const sellerFraction = member.roles.cache.find(role => fractions.includes(role.name))?.name;
 
             if (!sellerFraction) {
-                return await interaction.editReply('❌ Nemáte přiřazenou žádnou frakci.');
+                return await interaction.editReply(`${getEmoji('error')} Nemáte přiřazenou žádnou frakci.`);
             }
 
             const buyerOptions = fractions
@@ -94,7 +80,7 @@ module.exports = {
             if (buyerOptions.length === 0) {
                 return await interaction.editReply({
                     ephemeral: true,
-                    content: '❌ Nejsou k dispozici žádné jiné frakce pro obchod.',
+                    content: `${getEmoji('error')} Nejsou k dispozici žádné jiné frakce pro obchod.`,
                     embeds: [],
                     components: [],
                 });
@@ -107,8 +93,8 @@ module.exports = {
                 .addOptions(buyerOptions.slice(0, 25)); // Limit to 25 options
 
             const embed = new EmbedBuilder()
-                .setTitle('Prodej předmětu')
-                .setDescription(`Prodávající frakce: ${sellerFraction}\nCena: ${price}$`)
+                .setTitle(`${getEmoji('trade')} Prodej předmětu`)
+                .setDescription(`Prodávající frakce: ${sellerFraction}\nCena: ${price} ${getEmoji('money')}`)
                 .setColor(0x0099FF);
 
             const message = await interaction.editReply({
@@ -171,7 +157,7 @@ module.exports = {
                         
                             if (!hasItems) {
                                 return await i.editReply({
-                                    content: '❌ Vaše frakce nemá žádné předměty k prodeji.',
+                                    content: `${getEmoji('error')} Vaše frakce nemá žádné předměty k prodeji.`,
                                     embeds: [],
                                     components: []
                                 });
@@ -181,7 +167,7 @@ module.exports = {
                             
                             if (options.length === 0) {
                                 return await i.editReply({
-                                    content: '❌ Žádné předměty k zobrazení.',
+                                    content: `${getEmoji('error')} Žádné předměty k zobrazení.`,
                                     embeds: [],
                                     components: []
                                 });
@@ -191,7 +177,7 @@ module.exports = {
                         } catch (error) {
                             console.error('Error in select-buyer handler:', error);
                             await i.editReply({
-                                content: '❌ Nastala chyba při zpracování požadavku.',
+                                content: `${getEmoji('error')} Nastala chyba při zpracování požadavku.`,
                                 components: []
                             });
                         }
@@ -211,7 +197,7 @@ module.exports = {
                             embed.setDescription(
                                 `Prodávající frakce: ${sellerFraction}\n` +
                                 `Kupující frakce: ${selectedBuyer}\n` +
-                                `Cena: ${price}$\n` +
+                                `Cena: ${price} ${getEmoji('money')}\n` +
                                 `Stránka ${currentPage + 1}/${totalPages}`
                             );
                     
@@ -251,7 +237,7 @@ module.exports = {
                                     .addOptions(
                                         Array.from({ length: Math.min(25, itemData.count) }, (_, i) => i + 1)
                                             .map(num => ({
-                                                label: `${num}x`,
+                                                label: `${num}x (${num * price} ${getEmoji('money')})`,
                                                 value: num.toString()
                                             }))
                                     );
@@ -261,7 +247,7 @@ module.exports = {
                                     `Kupující frakce: ${selectedBuyer}\n` +
                                     `Předmět: ${itemData.name}\n` +
                                     `Dostupné množství: ${itemData.count}\n` +
-                                    `Cena: ${price}$`
+                                    `Cena: ${price} ${getEmoji('money')}`
                                 );
                         
                                 await i.editReply({
@@ -286,7 +272,7 @@ module.exports = {
                                     `Prodávající frakce: ${sellerFraction}\n` +
                                     `Kupující frakce: ${selectedBuyer}\n` +
                                     `Předmět: ${itemData.name}\n` +
-                                    `Cena: ${price}$`
+                                    `Cena: ${price} ${getEmoji('money')}`
                                 );
                         
                                 if (itemData.selectedMods) {
@@ -335,7 +321,7 @@ module.exports = {
                             `Kupující frakce: ${selectedBuyer}\n` +
                             `Předmět: ${selectedItem.name}\n` +
                             `Množství: ${selectedCount}x\n` +
-                            `Cena: ${price}$`
+                            `Cena: ${price} ${getEmoji('money')}`
                         );
 
                         await i.editReply({
@@ -372,14 +358,14 @@ module.exports = {
                         );
                     
                         const tradeEmbed = new EmbedBuilder()
-                            .setTitle('🤝 Nová obchodní nabídka')
+                            .setTitle(`${getEmoji('trade')} Nová obchodní nabídka`)
                             .setDescription(
                                 `Frakce **${sellerFraction}** nabízí frakci **${selectedBuyer}** následující předmět:`
                             )
                             .setColor(0x00FF00)
                             .addFields(
                                 { name: 'Předmět', value: selectedItem.name, inline: true },
-                                { name: 'Cena', value: `${price}$`, inline: true }
+                                { name: 'Cena', value: `${price} ${getEmoji('money')}`, inline: true }
                             );
 
                         // Přidat pole podle typu předmětu
@@ -427,7 +413,7 @@ module.exports = {
                         });
                     
                         await i.editReply({
-                            content: '✅ Obchodní nabídka byla úspěšně odeslána.',
+                            content: `${getEmoji('success')} Obchodní nabídka byla úspěšně odeslána.`,
                             embeds: [],
                             components: []
                         });
@@ -437,7 +423,7 @@ module.exports = {
                     else if (i.customId === 'cancel-trade') {
                         await i.deferUpdate();
                         await i.editReply({
-                            content: '❌ Obchodní nabídka byla zrušena.',
+                            content: `${getEmoji('error')} Obchodní nabídka byla zrušena.`,
                             embeds: [],
                             components: []
                         });
@@ -447,12 +433,12 @@ module.exports = {
                         console.error('Error in trade collector:', error);
                         if (!i.replied && !i.deferred) {
                             await i.reply({
-                                content: '❌ Nastala chyba při zpracování požadavku.',
+                                content: `${getEmoji('error')} Nastala chyba při zpracování požadavku.`,
                                 ephemeral: true
                             });
                         } else {
                             await i.editReply({
-                                content: '❌ Nastala chyba při zpracování požadavku.',
+                                content: `${getEmoji('error')} Nastala chyba při zpracování požadavku.`,
                                 components: []
                             });
                         }
@@ -473,7 +459,7 @@ module.exports = {
         } catch (error) {
             console.error('Error in tradeitem command:', error);
             await interaction.editReply({
-                content: '❌ Nastala chyba při zpracování příkazu.',
+                content: `${getEmoji('error')} Nastala chyba při zpracování příkazu.`,
                 components: []
             });
         }

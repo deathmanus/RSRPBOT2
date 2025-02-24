@@ -1,4 +1,5 @@
 const { EmbedBuilder } = require('discord.js');
+const { getEmoji } = require('../../utils/emojiUtils');
 const fs = require('fs');
 const path = require('path');
 
@@ -15,14 +16,13 @@ async function handleTradeResponse(interaction) {
 
         if (!fs.existsSync(tradePath)) {
             return await interaction.editReply({
-                content: '❌ Tato obchodní nabídka již není platná.',
+                content: `${getEmoji('error')} Tato obchodní nabídka již není platná.`,
                 components: []
             });
         }
 
         const tradeData = JSON.parse(fs.readFileSync(tradePath, 'utf8'));
         
-        // Check if user is in the buyer fraction
         if (!await checkFractionMembership(interaction, tradeData)) return;
 
         if (action === 'accept-trade') {
@@ -33,7 +33,7 @@ async function handleTradeResponse(interaction) {
     } catch (error) {
         console.error('Error handling trade response:', error);
         await interaction.followUp({
-            content: '❌ Nastala chyba při zpracování odpovědi na obchodní nabídku.',
+            content: `${getEmoji('error')} Nastala chyba při zpracování odpovědi na obchodní nabídku.`,
             ephemeral: true
         });
     }
@@ -45,7 +45,7 @@ async function checkFractionMembership(interaction, tradeData) {
 
     if (!hasFractionRole) {
         await interaction.followUp({
-            content: '❌ Nejste členem této frakce.',
+            content: `${getEmoji('error')} Nejste členem této frakce.`,
             ephemeral: true
         });
         return false;
@@ -54,7 +54,6 @@ async function checkFractionMembership(interaction, tradeData) {
 }
 
 async function processTrade(interaction, tradeData, tradePath) {
-    // Check buyer's money
     const buyerFractionPath = path.join(__dirname, '../../files/Fractions', tradeData.buyer, `${tradeData.buyer}.json`);
     const sellerFractionPath = path.join(__dirname, '../../files/Fractions', tradeData.seller, `${tradeData.seller}.json`);
     
@@ -63,34 +62,30 @@ async function processTrade(interaction, tradeData, tradePath) {
 
     if (buyerFractionData.money < tradeData.price) {
         return await interaction.followUp({
-            content: `❌ Vaše frakce nemá dostatek peněz (${tradeData.price}$).`,
+            content: `${getEmoji('error')} Vaše frakce nemá dostatek peněz (${tradeData.price} ${getEmoji('money')}).`,
             ephemeral: true
         });
     }
 
-    // Transfer items and money
     await transferTradeItems(tradeData);
     
-    // Update fraction money
     buyerFractionData.money -= tradeData.price;
     sellerFractionData.money += tradeData.price;
     
     fs.writeFileSync(buyerFractionPath, JSON.stringify(buyerFractionData, null, 2));
     fs.writeFileSync(sellerFractionPath, JSON.stringify(sellerFractionData, null, 2));
 
-    // Update trade status
     tradeData.status = 'accepted';
     tradeData.acceptedBy = interaction.user.tag;
     tradeData.acceptedAt = new Date().toISOString();
     fs.writeFileSync(tradePath, JSON.stringify(tradeData, null, 2));
 
-    // Update message
     const updatedEmbed = EmbedBuilder.from(interaction.message.embeds[0])
         .setColor(0x00FF00)
-        .setTitle('✅ Obchodní nabídka přijata')
+        .setTitle(`${getEmoji('success')} Obchodní nabídka přijata`)
         .addFields(
             { name: 'Přijal', value: interaction.user.tag, inline: true },
-            { name: 'Stav peněz', value: `Prodávající: ${sellerFractionData.money}$\nKupující: ${buyerFractionData.money}$` }
+            { name: 'Stav peněz', value: `Prodávající: ${sellerFractionData.money} ${getEmoji('money')}\nKupující: ${buyerFractionData.money} ${getEmoji('money')}` }
         );
 
     await interaction.message.edit({
@@ -99,7 +94,31 @@ async function processTrade(interaction, tradeData, tradePath) {
     });
 
     await interaction.followUp({
-        content: `✅ Obchodní nabídka byla úspěšně přijata a zpracována.`,
+        content: `${getEmoji('success')} Obchodní nabídka byla úspěšně přijata a zpracována.`,
+        ephemeral: true
+    });
+}
+
+async function declineTrade(interaction, tradeData, tradePath) {
+    tradeData.status = 'declined';
+    tradeData.declinedBy = interaction.user.tag;
+    tradeData.declinedAt = new Date().toISOString();
+    fs.writeFileSync(tradePath, JSON.stringify(tradeData, null, 2));
+
+    const updatedEmbed = EmbedBuilder.from(interaction.message.embeds[0])
+        .setColor(0xFF0000)
+        .setTitle(`${getEmoji('error')} Obchodní nabídka odmítnuta`)
+        .addFields(
+            { name: 'Odmítl', value: interaction.user.tag, inline: true }
+        );
+
+    await interaction.message.edit({
+        embeds: [updatedEmbed],
+        components: []
+    });
+
+    await interaction.followUp({
+        content: `${getEmoji('error')} Obchodní nabídka byla odmítnuta.`,
         ephemeral: true
     });
 }
@@ -108,7 +127,6 @@ async function transferTradeItems(tradeData) {
     const { buyer, seller, item, count } = tradeData;
     const fractionPath = path.join(__dirname, '../../files/Fractions');
     
-    // Get item paths
     const sellerItemPath = path.join(fractionPath, seller, item.section, item.file);
     const sellerSectionPath = path.join(fractionPath, seller, item.section);
     const buyerSectionPath = path.join(fractionPath, buyer, item.section);
@@ -120,11 +138,9 @@ async function transferTradeItems(tradeData) {
     const sellerItem = JSON.parse(fs.readFileSync(sellerItemPath, 'utf8'));
 
     if (item.type === 'countable') {
-        // Update seller's item
         if (sellerItem.count === count) {
             fs.unlinkSync(sellerItemPath);
             
-            // Check if seller's section is empty and remove if it is
             const remainingFiles = fs.readdirSync(sellerSectionPath)
                 .filter(file => file.endsWith('.json'));
             if (remainingFiles.length === 0) {
@@ -136,7 +152,6 @@ async function transferTradeItems(tradeData) {
             fs.writeFileSync(sellerItemPath, JSON.stringify(sellerItem, null, 2));
         }
 
-        // Check if buyer already has this item
         const buyerFiles = fs.readdirSync(buyerSectionPath)
             .filter(f => f.endsWith('.json'));
         
@@ -167,10 +182,8 @@ async function transferTradeItems(tradeData) {
             );
         }
     } else {
-        // For non-countable items, move the file
         fs.renameSync(sellerItemPath, path.join(buyerSectionPath, item.file));
         
-        // Check if seller's section is empty and remove if it is
         const remainingFiles = fs.readdirSync(sellerSectionPath)
             .filter(file => file.endsWith('.json'));
         if (remainingFiles.length === 0) {

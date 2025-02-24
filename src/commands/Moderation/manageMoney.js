@@ -1,4 +1,5 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { getEmoji } = require('../../utils/emojiUtils');
 const fs = require('fs');
 const path = require('path');
 
@@ -55,7 +56,7 @@ module.exports = {
 
             if (amount <= 0) {
                 return await interaction.reply({ 
-                    content: '❌ Částka musí být větší než 0.', 
+                    content: `${getEmoji('error')} Částka musí být větší než 0.`, 
                     ephemeral: true 
                 });
             }
@@ -64,7 +65,7 @@ module.exports = {
 
             if (!fs.existsSync(fractionFilePath)) {
                 return await interaction.reply({ 
-                    content: '❌ Tato frakce neexistuje.', 
+                    content: `${getEmoji('error')} Tato frakce neexistuje.`, 
                     ephemeral: true 
                 });
             }
@@ -73,7 +74,7 @@ module.exports = {
 
             if (!isAdding && fractionData.money < amount) {
                 return await interaction.reply({ 
-                    content: '❌ Frakce nemá dostatek peněz.', 
+                    content: `${getEmoji('error')} Frakce nemá dostatek peněz.`, 
                     ephemeral: true 
                 });
             }
@@ -86,11 +87,11 @@ module.exports = {
 
             const embed = new EmbedBuilder()
                 .setColor(isAdding ? 0x00FF00 : 0xFF0000)
-                .setTitle(`💰 Peníze ${isAdding ? 'přidány' : 'odebrány'}`)
-                .setDescription(`${isAdding ? 'Frakce' : 'Frakci'} **${fractionName}** ${isAdding ? 'obdržela' : 'bylo odebráno'} **${amount} $**.`)
+                .setTitle(`${getEmoji('money')} Peníze ${isAdding ? 'přidány' : 'odebrány'}`)
+                .setDescription(`${isAdding ? 'Frakce' : 'Frakci'} **${fractionName}** ${isAdding ? 'obdržela' : 'bylo odebráno'} **${amount} ${getEmoji('money')}**.`)
                 .addFields({ 
                     name: 'Nový zůstatek', 
-                    value: `${fractionData.money} $`, 
+                    value: `${fractionData.money} ${getEmoji('money')}`, 
                     inline: true 
                 });
 
@@ -99,7 +100,7 @@ module.exports = {
         } catch (error) {
             console.error('Chyba při správě peněz:', error);
             await interaction.reply({ 
-                content: '❌ Nastala chyba při správě peněz.', 
+                content: `${getEmoji('error')} Nastala chyba při správě peněz.`, 
                 ephemeral: true 
             });
         }

@@ -5,6 +5,7 @@ const {
     EmbedBuilder,
     AttachmentBuilder 
 } = require('discord.js');
+const { getEmoji, getCategoryEmoji } = require('../../utils/emojiUtils');
 const fs = require('fs');
 const path = require('path');
 
@@ -78,7 +79,10 @@ module.exports = {
                 .map(dirent => dirent.name);
 
             if (fractions.length === 0) {
-                return await interaction.followUp({ content: '❌ Žádné frakce k zobrazení.', ephemeral: true });
+                return await interaction.followUp({ 
+                    content: `${getEmoji('error')} Žádné frakce k zobrazení.`, 
+                    ephemeral: true 
+                });
             }
 
             const selectMenu = new StringSelectMenuBuilder()
@@ -93,7 +97,7 @@ module.exports = {
 
             const embed = new EmbedBuilder()
                 .setColor(0x00FF00)
-                .setTitle('Informace o frakci')
+                .setTitle(`${getEmoji('info')} Informace o frakci`)
                 .setDescription('Vyberte frakci z dropdown menu pro zobrazení informací.');
 
             await interaction.followUp({ embeds: [embed], components: [row], ephemeral: true });
@@ -134,7 +138,7 @@ module.exports = {
 
                     const fractionEmbed = new EmbedBuilder()
                         .setColor(fractionRole ? fractionRole.hexColor : 0x00FF00)
-                        .setTitle(`ℹ️ ${fractionData.nazev}`);
+                        .setTitle(`${getEmoji('fraction')} ${fractionData.nazev}`);
 
                     // If we have a logo, set it as thumbnail
                     if (files.length > 0) {
@@ -145,29 +149,30 @@ module.exports = {
                     fractionEmbed.setDescription(`>>> ${fractionData.popis || 'Žádný popis'}\n`)
                         .addFields(
                             { 
-                                name: '👥 Vedení',
+                                name: `${getEmoji('members')} Vedení`,
                                 value: `\n${[
-                                    `👑 **Velitel:** ${leader || 'Nikdo' }`,
-                                    `🎖️ **Zástupce:** ${deputy || 'Nikdo' }`,
-                                    `👤 **Počet členů:** ${fractionMembers.size || 0}`
+                                    `${getEmoji('leader')} **Velitel:** ${leader || 'Nikdo'}`,
+                                    `${getEmoji('deputy')} **Zástupce:** ${deputy || 'Nikdo'}`,
+                                    `${getEmoji('member')} **Počet členů:** ${fractionMembers.size || 0}`
                                 ].join('\n')}\n`,
                                 inline: false 
                             },
                             {
-                                name: '🎭 Role',
+                                name: `${getEmoji('roles')} Role`,
                                 value: `\n${[
-                                    `⭐ Velitel: ${leaderRole}`,
-                                    `🌟 Zástupce: ${deputyRole}`,
-                                    `👥 Člen: ${fractionRole}`
+                                    `${getEmoji('leader')} Velitel: ${leaderRole}`,
+                                    `${getEmoji('deputy')} Zástupce: ${deputyRole}`,
+                                    `${getEmoji('member')} Člen: ${fractionRole}`
                                 ].join('\n')}\n`,
                                 inline: false
                             },
                             {
-                                name: '📊 Statistiky',
+                                name: `${getEmoji('stats')} Statistiky`,
                                 value: `\n${[
-                                    `💰 **Peníze:** ${(fractionData.money || 0).toLocaleString()} $`,
-                                    `⚠️ **Warny:** ${fractionData.warns || 0}/3`,
-                                    `📅 **Založeno před:** ${fractionData.creationDate ? getTimeDifference(fractionData.creationDate) : 'Neznámo'}`,                                    `💬 **Kanál:** ${room}`
+                                    `${getEmoji('money')} **Peníze:** ${(fractionData.money || 0).toLocaleString()} ${getEmoji('money')}`,
+                                    `${getEmoji('warns')} **Warny:** ${fractionData.warns || 0}/3`,
+                                    `${getEmoji('dates')} **Založeno před:** ${fractionData.creationDate ? getTimeDifference(fractionData.creationDate) : 'Neznámo'}`,
+                                    `${getEmoji('channel')} **Kanál:** ${room}`
                                 ].join('\n')}\n`,
                                 inline: false
                             }
@@ -220,7 +225,7 @@ module.exports = {
                     // Update the inventory display part in the collector's collect event
                     if (totalItems > 0) {
                         fractionEmbed.addFields({
-                            name: '🎒 Inventář',
+                            name: `${getEmoji('inventory')} Inventář`,
                             value: `\nCelkem předmětů: ${totalItems}\n`,
                             inline: false
                         });
@@ -256,8 +261,9 @@ module.exports = {
                                     return `• ${item.name}`;
                                 }).join('\n');
 
+                                const categoryKey = category.toLowerCase().replace(' ', '_');
                                 fractionEmbed.addFields({
-                                    name: `${categoryEmojis[category]} ${category} (${inventory.count})`,
+                                    name: `${getCategoryEmoji(categoryKey)} ${category} (${inventory.count})`,
                                     value: `\n${formattedItems}\n`,
                                     inline: false
                                 });
@@ -265,7 +271,7 @@ module.exports = {
                         }
                     } else {
                         fractionEmbed.addFields({
-                            name: '🎒 Inventář',
+                            name: `${getEmoji('inventory')} Inventář`,
                             value: '\n> Žádné předměty\n',
                             inline: false
                         });
@@ -293,7 +299,7 @@ module.exports = {
                     console.error('Chyba při zobrazení informací o frakci:', error);
                     try {
                         await i.update({ 
-                            content: '❌ Chyba při zobrazení informací o frakci.', 
+                            content: `${getEmoji('error')} Chyba při zobrazení informací o frakci.`, 
                             embeds: [], 
                             components: [], 
                             files: [] 
@@ -333,7 +339,7 @@ module.exports = {
             console.error('Chyba v příkazu fractioninfo:', error);
             try {
                 await interaction.editReply({ 
-                    content: '❌ Chyba při zpracování příkazu.', 
+                    content: `${getEmoji('error')} Chyba při zpracování příkazu.`, 
                     embeds: [], 
                     components: [], 
                     files: [] 
