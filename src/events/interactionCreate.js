@@ -1,134 +1,70 @@
-const { Interaction, EmbedBuilder, PermissionsBitField } = require("discord.js");
-const { handleTradeResponse } = require("../components/handlers/TradeHandler");
-const { handleRoleResponse } = require('../components/handlers/RoleHandler');
-const TicketHandler = require('../components/handlers/TicketHandler');
-const fs = require('fs');
-const path = require('path');
+const { Events } = require('discord.js');
+const { handleRoleResponse, handlePermissionResponse } = require('../components/handlers/RoleHandler');
+const { handleTicketCreate, handleTicketDelete, handleTicketArchive, handleTicketUnarchive, handleAddCategory, handleRemoveCategory, handleRewardClaim } = require('../components/handlers/TicketHandler');
+const { handleTradeResponse } = require('../components/handlers/TradeHandler');
 
 const logChannelId = '1213225816201240587';
 
 module.exports = {
-    name: 'interactionCreate',
-    async execute(interaction, client) {
+    name: Events.InteractionCreate,
+    async execute(interaction) {
         try {
-            // Handle commands
-            if (interaction.isCommand()) {
-                // Check custom permissions
-                const permissionsPath = path.join(__dirname, '../files/permissions.json');
-                if (fs.existsSync(permissionsPath)) {
-                    const permissions = JSON.parse(fs.readFileSync(permissionsPath, 'utf8'));
-                    
-                    if (permissions[interaction.commandId]) {
-                        // Check if user has admin permissions or any of the allowed roles
-                        const allowedRoles = permissions[interaction.commandId].roles;
-                        const hasPermission = interaction.member.permissions.has(PermissionsBitField.Flags.Administrator) ||
-                            interaction.member.roles.cache.some(role => 
-                                allowedRoles.includes(role.id)
-                            );
-                        
-                        if (!hasPermission) {
-                            await interaction.reply({
-                                content: '❌ Nemáte oprávnění pro použití tohoto příkazu.',
-                                ephemeral: true
-                            });
-                            return;
-                        }
-                    }
-                }
-
-                // Log the command usage
-                const logChannel = interaction.guild.channels.cache.get(logChannelId);
-                const embed = new EmbedBuilder()
-                    .setTitle('Command log')
-                    .setDescription('User: ' + `<@${interaction.user.id}>, id - ${interaction.user.id}\n`+ 'Command: ' + interaction.commandName)
-                    .setColor(2);
-                await logChannel.send({ embeds: [embed] });
-
-                // Execute the command
-                const command = client.commands.get(interaction.commandName);
+            // Command handling
+            if (interaction.isChatInputCommand()) {
+                const command = interaction.client.commands.get(interaction.commandName);
                 if (!command) return;
 
                 try {
-                    await command.execute(interaction, client);
+                    await command.execute(interaction);
                 } catch (error) {
-                    console.error('Command execution error:', error);
-                    await interaction.reply({
-                        content: 'There was an error while executing this command!',
-                        ephemeral: true
-                    });
+                    console.error(error);
+                    if (interaction.replied || interaction.deferred) {
+                        await interaction.followUp({ content: 'There was an error while executing this command!', ephemeral: true });
+                    } else {
+                        await interaction.reply({ content: 'There was an error while executing this command!', ephemeral: true });
+                    }
                 }
                 return;
             }
 
-            // Handle select menu interactions
-            if (interaction.isStringSelectMenu()) {
-                if (interaction.customId === 'ticket_create') {
-                    await TicketHandler.handleTicketCreate(interaction);
-                    return;
-                }
-                if (interaction.customId === 'ticket_response') {
-                    await TicketHandler.handleTicketResponse(interaction);
-                    return;
-                }
-            }
-
-            // Handle button interactions
+            // Button interactions
             if (interaction.isButton()) {
-                const [action] = interaction.customId.split(':');
-                
+                const customId = interaction.customId;
+
                 // Ticket system buttons
-                if (interaction.customId.startsWith('reward_')) {
-                    await TicketHandler.handleRewardClaim(interaction);
-                    return;
+                if (customId === 'create_ticket') await handleTicketCreate(interaction);
+                else if (customId === 'delete_ticket') await handleTicketDelete(interaction);
+                else if (customId === 'ticket_archive') await handleTicketArchive(interaction);
+                else if (customId === 'ticket_unarchive') await handleTicketUnarchive(interaction);
+                else if (customId === 'add_category') await handleAddCategory(interaction);
+                else if (customId === 'remove_category') await handleRemoveCategory(interaction);
+                
+                // Role system buttons
+                else if (customId.startsWith('accept-invite:') || customId.startsWith('decline-invite:')) {
+                    await handleRoleResponse(interaction);
+                }
+                
+                // Permission request buttons
+                else if (customId.startsWith('perm-accept:') || customId.startsWith('perm-deny:')) {
+                    await handlePermissionResponse(interaction);
                 }
 
-                switch (interaction.customId) {
-                    case 'ticket_close':
-                        await TicketHandler.handleTicketClose(interaction);
-                        return;
-                    case 'ticket_close_confirm':
-                        await TicketHandler.handleTicketCloseConfirm(interaction);
-                        return;
-                    case 'ticket_close_cancel':
-                        await TicketHandler.handleTicketCloseCancel(interaction);
-                        return;
-                    case 'ticket_archive':
-                        await TicketHandler.handleTicketArchive(interaction);
-                        return;
-                    case 'ticket_unarchive':
-                        await TicketHandler.handleTicketUnarchive(interaction);
-                        return;
+                // Trade system buttons
+                else if (customId.startsWith('trade-accept:') || customId.startsWith('trade-decline:')) {
+                    await handleTradeResponse(interaction);
                 }
 
-                // Existing button handlers
-                if (action === 'accept-trade' || action === 'decline-trade') {
-                    try {
-                        await handleTradeResponse(interaction);
-                    } catch (error) {
-                        console.error('Trade response error:', error);
-                        if (!interaction.replied && !interaction.deferred) {
-                            await interaction.reply({
-                                content: '❌ Nastala chyba při zpracování odpovědi.',
-                                ephemeral: true
-                            });
-                        }
-                    }
-                } else if (['accept-invite', 'decline-invite'].includes(action)) {
-                    try {
-                        await handleRoleResponse(interaction);
-                    } catch (error) {
-                        console.error('Role response error:', error);
-                        if (!interaction.replied && !interaction.deferred) {
-                            await interaction.reply({
-                                content: '❌ Nastala chyba při zpracování odpovědi.',
-                                ephemeral: true
-                            });
-                        }
-                    }
-                }
+                return;
             }
+
+            // Reward claim button
+            if (interaction.isStringSelectMenu() && interaction.customId === 'reward_select') {
+                await handleRewardClaim(interaction);
+                return;
+            }
+
         } catch (error) {
-            console.error('Interaction handling error:', error);
+            console.error('Error in interaction handler:', error);
         }
-    }
+    },
 };

@@ -119,4 +119,109 @@ async function processRoleDecline(interaction, fractionName) {
     }
 }
 
-module.exports = { handleRoleResponse };
+async function handlePermissionResponse(interaction) {
+    const [action, userId, fractionName, requestType] = interaction.customId.split(':');
+    
+    if (!['perm-accept', 'perm-deny'].includes(action)) return;
+
+    try {
+        await interaction.deferUpdate();
+
+        // Verify leader permissions
+        const leaderRole = interaction.guild.roles.cache.find(r => r.name === `Velitel ${fractionName}`);
+        if (!interaction.member.roles.cache.has(leaderRole.id)) {
+            return await interaction.followUp({
+                content: '❌ Nemáte oprávnění odpovědět na tuto žádost.',
+                ephemeral: true
+            });
+        }
+
+        const targetMember = await interaction.guild.members.fetch(userId);
+        if (!targetMember) {
+            return await interaction.followUp({
+                content: '❌ Uživatel nebyl nalezen.',
+                ephemeral: true
+            });
+        }
+
+        if (action === 'perm-accept') {
+            await processPermissionAccept(interaction, targetMember, fractionName, requestType);
+        } else {
+            await processPermissionDeny(interaction, targetMember, fractionName, requestType);
+        }
+
+    } catch (error) {
+        console.error('Error handling permission response:', error);
+        await interaction.followUp({
+            content: '❌ Nastala chyba při zpracování odpovědi na žádost.',
+            ephemeral: true
+        });
+    }
+}
+
+async function processPermissionAccept(interaction, targetMember, fractionName, requestType) {
+    try {
+        if (requestType === 'deputy') {
+            const deputyRole = interaction.guild.roles.cache.find(r => r.name === `Zástupce ${fractionName}`);
+            await targetMember.roles.add(deputyRole);
+        }
+
+        const updatedEmbed = EmbedBuilder.from(interaction.message.embeds[0])
+            .setColor(0x00FF00)
+            .setTitle('✅ Žádost schválena')
+            .addFields({
+                name: 'Status',
+                value: `Schváleno uživatelem ${interaction.user.tag}`,
+                inline: true
+            });
+
+        await interaction.message.edit({
+            embeds: [updatedEmbed],
+            components: []
+        });
+
+        await interaction.followUp({
+            content: `✅ Žádost uživatele ${targetMember} byla schválena.`,
+            ephemeral: false
+        });
+
+    } catch (error) {
+        console.error('Error processing permission accept:', error);
+        await interaction.followUp({
+            content: '❌ Nastala chyba při udělování oprávnění.',
+            ephemeral: true
+        });
+    }
+}
+
+async function processPermissionDeny(interaction, targetMember, fractionName, requestType) {
+    try {
+        const updatedEmbed = EmbedBuilder.from(interaction.message.embeds[0])
+            .setColor(0xFF0000)
+            .setTitle('❌ Žádost zamítnuta')
+            .addFields({
+                name: 'Status',
+                value: `Zamítnuto uživatelem ${interaction.user.tag}`,
+                inline: true
+            });
+
+        await interaction.message.edit({
+            embeds: [updatedEmbed],
+            components: []
+        });
+
+        await interaction.followUp({
+            content: `❌ Žádost uživatele ${targetMember} byla zamítnuta.`,
+            ephemeral: false
+        });
+
+    } catch (error) {
+        console.error('Error processing permission deny:', error);
+        await interaction.followUp({
+            content: '❌ Nastala chyba při zamítnutí žádosti.',
+            ephemeral: true
+        });
+    }
+}
+
+module.exports = { handleRoleResponse, handlePermissionResponse };
