@@ -1,0 +1,48 @@
+{
+    "categories": [
+        {
+            "id": "1",
+            "label": "General Support",
+            "description": "General support tickets",
+            "categoryId": "1213225816582914099",
+            "archiveCategoryId": "1213225817447075901",
+            "message": {
+                "title": "General Support Ticket",
+                "description": "Welcome to your support ticket!\nPlease describe your issue and wait for staff to assist you.",
+                "color": "Blue"
+            },
+            "hideMenuAfterSelection": true,
+            "responseOptions": [
+                {
+                    "id": "help_1",
+                    "label": "Často kladené otázky",
+                    "description": "Základní informace a odpovědi",
+                    "type": "text",
+                    "content": "Zde jsou často kladené otázky a odpovědi:\n1. Otázka 1...\n2. Otázka 2...",
+                    "keepSelectable": true
+                },
+                {
+                    "id": "help_2",
+                    "label": "Návod k použití",
+                    "description": "Obrazový průvodce",
+                    "type": "image",
+                    "content": "https://devforum-uploads.s3.dualstack.us-east-2.amazonaws.com/uploads/original/4X/f/f/2/ff20770fed9cad55837fe1007a2874069ada45ff.png",
+                    "keepSelectable": false
+                }
+            ]
+        }
+    ],
+    "buttons": {
+        "close": {
+            "label": "Close Ticket",
+            "style": "Danger",
+            "emoji": "🔒"
+        },
+        "archive": {
+            "label": "Archive Ticket",
+            "style": "Secondary",
+            "emoji": "📑"
+        }
+    },
+    "embedColor": "Blue"
+}
