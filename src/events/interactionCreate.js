@@ -77,6 +77,11 @@ module.exports = {
                 const [action] = interaction.customId.split(':');
                 
                 // Ticket system buttons
+                if (interaction.customId.startsWith('reward_')) {
+                    await TicketHandler.handleRewardClaim(interaction);
+                    return;
+                }
+
                 switch (interaction.customId) {
                     case 'ticket_close':
                         await TicketHandler.handleTicketClose(interaction);

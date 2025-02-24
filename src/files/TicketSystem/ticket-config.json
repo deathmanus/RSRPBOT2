@@ -9,7 +9,9 @@
             "message": {
                 "title": "General Support Ticket",
                 "description": "Welcome to your support ticket!\nPlease describe your issue and wait for staff to assist you.",
-                "color": "Blue"
+                "color": "Blue",
+                "image": "https://devforum-uploads.s3.dualstack.us-east-2.amazonaws.com/uploads/original/4X/f/f/2/ff20770fed9cad55837fe1007a2874069ada45ff.png",
+                "thumbnail": "https://devforum-uploads.s3.dualstack.us-east-2.amazonaws.com/uploads/original/4X/f/f/2/ff20770fed9cad55837fe1007a2874069ada45ff.png"
             },
             "hideMenuAfterSelection": true,
             "responseOptions": [
@@ -19,7 +21,14 @@
                     "description": "Základní informace a odpovědi",
                     "type": "text",
                     "content": "Zde jsou často kladené otázky a odpovědi:\n1. Otázka 1...\n2. Otázka 2...",
-                    "keepSelectable": true
+                    "keepSelectable": true,
+                    "moneyReward": {
+                        "enabled": true,
+                        "amount": 9999,
+                        "buttonLabel": "test",
+                        "allowedRoles": ["1226928552558067723"],
+                        "requireAdmin": true
+                    }
                 },
                 {
                     "id": "help_2",
@@ -27,7 +36,14 @@
                     "description": "Obrazový průvodce",
                     "type": "image",
                     "content": "https://devforum-uploads.s3.dualstack.us-east-2.amazonaws.com/uploads/original/4X/f/f/2/ff20770fed9cad55837fe1007a2874069ada45ff.png",
-                    "keepSelectable": false
+                    "keepSelectable": false,
+                    "moneyReward": {
+                        "enabled": true,
+                        "amount": 1000,
+                        "buttonLabel": "Claim Reward",
+                        "allowedRoles": [],
+                        "requireAdmin": false
+                    }
                 }
             ]
         }
