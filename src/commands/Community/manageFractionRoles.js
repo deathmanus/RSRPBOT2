@@ -1,35 +1,36 @@
 const { 
     SlashCommandBuilder, 
-    EmbedBuilder, 
     ActionRowBuilder, 
+    StringSelectMenuBuilder, 
     ButtonBuilder, 
-    ButtonStyle 
+    ButtonStyle, 
+    EmbedBuilder 
 } = require('discord.js');
 const fs = require('fs');
 const path = require('path');
 
 module.exports = {
     data: new SlashCommandBuilder()
-        .setName('role')
-        .setDescription('Správa rolí frakce') // Added main command description
+        .setName('managefractionroles')
+        .setDescription('Spravuje role členů frakce')
         .addSubcommand(subcommand =>
             subcommand
                 .setName('add')
-                .setDescription('Přidá uživateli roli frakce')
+                .setDescription('Přidá uživatele do frakce')
                 .addUserOption(option =>
                     option
                         .setName('user')
-                        .setDescription('Uživatel, kterému chcete přidat roli')
+                        .setDescription('Uživatel k přidání')
                         .setRequired(true))
                 .addBooleanOption(option =>
                     option
                         .setName('deputy')
-                        .setDescription('Přidat i roli zástupce?')
+                        .setDescription('Přidat jako zástupce')
                         .setRequired(false)))
         .addSubcommand(subcommand =>
             subcommand
                 .setName('remove')
-                .setDescription('Odebere uživateli roli frakce')
+                .setDescription('Odebere uživatele z frakce')
                 .addUserOption(option =>
                     option
                         .setName('user')
@@ -40,16 +41,8 @@ module.exports = {
         try {
             await interaction.deferReply();
             
-            // Check if user has leader/deputy permissions
-            const member = interaction.member;
-            const isLeader = member.roles.cache.some(r => r.name.startsWith('Velitel'));
-            const isDeputy = member.roles.cache.some(r => r.name.startsWith('Zástupce'));
-
-            if (!isLeader && !isDeputy) {
-                return await interaction.editReply('❌ Nemáte oprávnění používat tento příkaz.');
-            }
-
             // Get user's fraction
+            const member = interaction.member;
             const fractionPath = path.join(__dirname, '../../files/Fractions');
             const fractions = fs.readdirSync(fractionPath, { withFileTypes: true })
                 .filter(dirent => dirent.isDirectory())

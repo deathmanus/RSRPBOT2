@@ -314,18 +314,6 @@ module.exports = {
                                     embeds: []
                                 });
                             }
-
-                            const isLeader = member.roles.cache.some(role => role.name.startsWith('Velitel'));
-                            const isDeputy = member.roles.cache.some(role => role.name.startsWith('Zástupce'));
-
-                            if (!isLeader && !isDeputy) {
-                                return await i.editReply({
-                                content: '❌ Pouze velitelé a zástupci frakcí mohou nakupovat.',
-                                components: [],
-                                embeds: []
-                            });
-                    }
-
                     
                             const fractionPath = path.join(__dirname, '../../files/Fractions', fractionRole.name);
                             const fractionData = JSON.parse(fs.readFileSync(path.join(fractionPath, `${fractionRole.name}.json`)));

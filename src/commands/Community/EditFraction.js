@@ -32,7 +32,7 @@ module.exports = {
         try {
             await interaction.deferReply({ ephemeral: true });
 
-            // Check if user is leader or deputy
+            // Check if user is in a fraction
             const member = interaction.member;
             const fractionRole = member.roles.cache.find(role => 
                 fs.existsSync(path.join(__dirname, '../../files/Fractions', role.name)));
@@ -40,16 +40,6 @@ module.exports = {
             if (!fractionRole) {
                 return await interaction.editReply({
                     content: '❌ Nejste členem žádné frakce.',
-                    components: []
-                });
-            }
-
-            const isLeader = member.roles.cache.some(role => role.name.startsWith('Velitel'));
-            const isDeputy = member.roles.cache.some(role => role.name.startsWith('Zástupce'));
-
-            if (!isLeader && !isDeputy) {
-                return await interaction.editReply({
-                    content: '❌ Pouze velitelé a zástupci frakcí mohou upravovat nastavení.',
                     components: []
                 });
             }

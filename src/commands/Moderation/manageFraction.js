@@ -12,10 +12,20 @@ const fs = require('fs');
 const path = require('path');
 const axios = require('axios');
 
+// Command IDs for permission management
+const RESTRICTED_COMMANDS = [
+    '1343535946779594803',
+    '1343535946288857150',
+    '1343535946288857149',
+    '1343535946779594802',
+    '1343535946779594804'
+];
+
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('fraction')
         .setDescription('Správa frakcí')
+        .setDefaultMemberPermissions(PermissionsBitField.Flags.Administrator) // Set default to admin
         .addSubcommand(subcommand =>
             subcommand
                 .setName('create')
@@ -109,6 +119,38 @@ async function handleCreate(interaction) {
             color: `#${barva}`,
             position: guild.roles.cache.get(roleHierarchy).position - 1
         });
+
+        // Store the roles in a permissions JSON file instead of trying to set Discord permissions directly
+        try {
+            const permissionsPath = path.join(__dirname, '../../files/permissions.json');
+            let permissions = {};
+            
+            // Load existing permissions if file exists
+            if (fs.existsSync(permissionsPath)) {
+                permissions = JSON.parse(fs.readFileSync(permissionsPath, 'utf8'));
+            }
+            
+            // Add new faction's roles to permissions
+            for (const commandId of RESTRICTED_COMMANDS) {
+                if (!permissions[commandId]) {
+                    permissions[commandId] = {
+                        roles: []
+                    };
+                }
+                
+                // Add leader and deputy roles
+                permissions[commandId].roles.push(
+                    leaderRole.id,
+                    deputyRole.id
+                );
+            }
+            
+            // Save updated permissions
+            fs.writeFileSync(permissionsPath, JSON.stringify(permissions, null, 2));
+            
+        } catch (error) {
+            console.error('Error setting command permissions:', error);
+        }
 
         const room = await guild.channels.create({
             name: `frakce-${zkratka.toLowerCase()}`,
@@ -623,7 +665,7 @@ async function handleWarn(interaction) {
             if (reason === 'time') {
                 await interaction.editReply({
                     content: '⌛ Časový limit vypršel.',
-                    components: [],
+                    components: [], 
                     embeds: []
                 });
             }

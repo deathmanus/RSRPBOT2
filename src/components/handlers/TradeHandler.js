@@ -22,8 +22,8 @@ async function handleTradeResponse(interaction) {
 
         const tradeData = JSON.parse(fs.readFileSync(tradePath, 'utf8'));
         
-        // Check buyer permissions
-        if (!await checkTradePermissions(interaction, tradeData)) return;
+        // Check if user is in the buyer fraction
+        if (!await checkFractionMembership(interaction, tradeData)) return;
 
         if (action === 'accept-trade') {
             await processTrade(interaction, tradeData, tradePath);
@@ -39,15 +39,13 @@ async function handleTradeResponse(interaction) {
     }
 }
 
-async function checkTradePermissions(interaction, tradeData) {
+async function checkFractionMembership(interaction, tradeData) {
     const member = interaction.member;
-    const isLeader = member.roles.cache.some(r => r.name.includes('Velitel'));
-    const isDeputy = member.roles.cache.some(r => r.name.includes('Zástupce'));
     const hasFractionRole = member.roles.cache.some(role => role.name === tradeData.buyer);
 
-    if (!(isLeader || isDeputy) || !hasFractionRole) {
+    if (!hasFractionRole) {
         await interaction.followUp({
-            content: '❌ Nemáte oprávnění reagovat na tuto obchodní nabídku.',
+            content: '❌ Nejste členem této frakce.',
             ephemeral: true
         });
         return false;
