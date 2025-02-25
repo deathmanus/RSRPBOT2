@@ -1,6 +1,6 @@
 const { Events } = require('discord.js');
+const TicketHandler = require('../components/handlers/TicketHandler');
 const { handleRoleResponse, handlePermissionResponse } = require('../components/handlers/RoleHandler');
-const { handleTicketCreate, handleTicketDelete, handleTicketArchive, handleTicketUnarchive, handleAddCategory, handleRemoveCategory, handleRewardClaim } = require('../components/handlers/TicketHandler');
 const { handleTradeResponse } = require('../components/handlers/TradeHandler');
 
 const logChannelId = '1213225816201240587';
@@ -32,12 +32,13 @@ module.exports = {
                 const customId = interaction.customId;
 
                 // Ticket system buttons
-                if (customId === 'create_ticket') await handleTicketCreate(interaction);
-                else if (customId === 'delete_ticket') await handleTicketDelete(interaction);
-                else if (customId === 'ticket_archive') await handleTicketArchive(interaction);
-                else if (customId === 'ticket_unarchive') await handleTicketUnarchive(interaction);
-                else if (customId === 'add_category') await handleAddCategory(interaction);
-                else if (customId === 'remove_category') await handleRemoveCategory(interaction);
+                if (customId === 'ticket_close') await TicketHandler.handleTicketClose(interaction);
+                else if (customId === 'ticket_close_confirm') await TicketHandler.handleTicketCloseConfirm(interaction);
+                else if (customId === 'ticket_close_cancel') await TicketHandler.handleTicketCloseCancel(interaction);
+                else if (customId === 'ticket_archive') await TicketHandler.handleTicketArchive(interaction);
+                else if (customId === 'ticket_unarchive') await TicketHandler.handleTicketUnarchive(interaction);
+                // Handle reward claim buttons
+                else if (customId.startsWith('reward_')) await TicketHandler.handleRewardClaim(interaction);
                 
                 // Role system buttons
                 else if (customId.startsWith('accept-invite:') || customId.startsWith('decline-invite:')) {
@@ -57,9 +58,14 @@ module.exports = {
                 return;
             }
 
-            // Reward claim button
-            if (interaction.isStringSelectMenu() && interaction.customId === 'reward_select') {
-                await handleRewardClaim(interaction);
+            // Select menu interactions
+            if (interaction.isStringSelectMenu()) {
+                const customId = interaction.customId;
+
+                // Ticket system select menus
+                if (customId === 'ticket_create') await TicketHandler.handleTicketCreate(interaction);
+                else if (customId === 'ticket_response') await TicketHandler.handleTicketResponse(interaction);
+
                 return;
             }
 

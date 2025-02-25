@@ -14,3 +14,14 @@
 {"timestamp":"2025-02-24T18:44:59.523Z","action":"Section Selected","data":{"selectedSection":"Air vehicles"}}
 {"timestamp":"2025-02-24T18:44:59.525Z","action":"Section Loaded","data":{"section":"Air vehicles","itemCount":5}}
 {"timestamp":"2025-02-24T18:45:20.876Z","action":"Purchase Completed","data":{"itemId":"m7jer1oim58fqk24u5d","buyer":"death_man","fraction":"z","totalPrice":11800}}
+{"timestamp":"2025-02-24T21:14:20.970Z","action":"Command Started","data":{"user":"death_man","userId":"705815238716686337","channel":"》cmd-logs📖","guildId":"1213225813844037734"}}
+{"timestamp":"2025-02-24T21:14:21.241Z","action":"Loaded Shop Sections","data":{"sections":["Air vehicles","Equipment","Ground vehicles"]}}
+{"timestamp":"2025-02-24T21:14:21.441Z","action":"Initial Shop Menu Created","data":{"type":"section_select","available_sections":["Air vehicles","Equipment","Ground vehicles"]}}
+{"timestamp":"2025-02-24T21:14:23.363Z","action":"Section Selected","data":{"selectedSection":"Air vehicles"}}
+{"timestamp":"2025-02-24T21:14:23.365Z","action":"Section Loaded","data":{"section":"Air vehicles","itemCount":5}}
+{"timestamp":"2025-02-24T21:14:28.777Z","action":"Section Selected","data":{"selectedSection":"Equipment"}}
+{"timestamp":"2025-02-24T21:14:28.780Z","action":"Section Loaded","data":{"section":"Equipment","itemCount":7}}
+{"timestamp":"2025-02-24T21:14:30.134Z","action":"Section Selected","data":{"selectedSection":"Air vehicles"}}
+{"timestamp":"2025-02-24T21:14:30.134Z","action":"Cache Hit","data":{"section":"Air vehicles"}}
+{"timestamp":"2025-02-24T21:15:56.648Z","action":"Purchase Completed","data":{"itemId":"m7jk4prgs7qaq44tdo","buyer":"death_man","fraction":"z","totalPrice":15100}}
+{"timestamp":"2025-02-24T21:19:21.451Z","action":"Collector Ended","data":{"reason":"time","interactionsCollected":12}}
