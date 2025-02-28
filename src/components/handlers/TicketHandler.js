@@ -211,31 +211,77 @@ class TicketHandler {
             .setTitle(selectedOption.label);
 
         try {
-            if (selectedOption.type === 'image') {
-                new URL(selectedOption.content);
-                response.setImage(selectedOption.content);
-            } else {
-                response.setDescription(selectedOption.content);
-            }
-
-            // Check if this option has a money reward
+            // Check if this option has a money reward and prepare components first
             const components = [];
             if (selectedOption.moneyReward?.enabled) {
                 const channelRewardsClaimed = this.rewardsClaimed.get(interaction.channel.id) || new Set();
                 
                 if (!channelRewardsClaimed.has(selectedOption.id)) {
-                    console.log('Creating reward button for option:', selectedOption.id); // Debug log
+                    console.log('Creating reward button for option:', selectedOption.id);
                     const rewardButton = new ButtonBuilder()
-                        .setCustomId(`reward_${selectedOption.id}`) // Ensure this matches exactly
+                        .setCustomId(`reward_${selectedOption.id}`)
                         .setLabel(selectedOption.moneyReward.buttonLabel || 'Claim Reward')
                         .setStyle(ButtonStyle.Primary);
-                    console.log('Created button with customId:', `reward_${selectedOption.id}`); // Debug log
+                    console.log('Created button with customId:', `reward_${selectedOption.id}`);
 
                     components.push(new ActionRowBuilder().addComponents(rewardButton));
                 }
             }
 
-            // Find the original menu message
+            // Handle different response types
+            if (selectedOption.type === 'image') {
+                new URL(selectedOption.content);
+                response.setImage(selectedOption.content);
+                await interaction.reply({
+                    embeds: [response],
+                    components: components,
+                    ephemeral: false
+                });
+            } else if (selectedOption.type === 'randomImage') {
+                const imageDir = path.join(__dirname, '../../files/TicketSystem/images');
+                console.log('📂 Checking directory:', imageDir);
+                
+                if (!fs.existsSync(imageDir)) {
+                    console.log('❌ Directory does not exist');
+                    fs.mkdirSync(imageDir, { recursive: true });
+                }
+                
+                const imageFiles = fs.readdirSync(imageDir)
+                    .filter(file => /\.(jpg|jpeg|png|gif|webp)$/i.test(file));
+                
+                console.log('📸 Found images:', imageFiles);
+                
+                if (imageFiles.length === 0) {
+                    response.setDescription('Nenalezeny žádné obrázky ve složce.');
+                    await interaction.reply({
+                        embeds: [response],
+                        components: components,
+                        ephemeral: false
+                    });
+                } else {
+                    const randomImage = imageFiles[Math.floor(Math.random() * imageFiles.length)];
+                    const imagePath = path.join(imageDir, randomImage);
+                    console.log('🎲 Selected image:', randomImage);
+                    console.log('📄 Full image path:', imagePath);
+                    
+                    response.setDescription(`Náhodně vybraný obrázek: ${randomImage}`);
+                    await interaction.reply({ 
+                        embeds: [response],
+                        files: [imagePath],
+                        components: components,
+                        ephemeral: false 
+                    });
+                }
+            } else {
+                response.setDescription(selectedOption.content);
+                await interaction.reply({
+                    embeds: [response],
+                    components: components,
+                    ephemeral: false
+                });
+            }
+
+            // Update menu visibility and options
             const messages = await interaction.channel.messages.fetch({ limit: 10 });
             const menuMessage = messages.find(m => 
                 m.components.length > 0 && 
@@ -284,14 +330,10 @@ class TicketHandler {
                     await menuMessage.edit({ components: originalComponents });
                 }
             }
-
-            await interaction.reply({
-                embeds: [response],
-                components: components,
-                ephemeral: false
-            });
         } catch (error) {
             console.error('Error processing response:', error);
+            console.error('Error details:', error.message);
+            console.error('Error stack:', error.stack);
             await interaction.reply({
                 content: '❌ Chyba při zpracování odpovědi. Kontaktujte prosím administrátora.',
                 ephemeral: true
@@ -334,19 +376,20 @@ class TicketHandler {
             console.log('🔒 Checking permissions...');
             console.log('Member roles:', interaction.member.roles.cache.map(r => r.id));
             console.log('Required roles:', selectedOption.moneyReward.allowedRoles);
-            console.log('Requires admin:', selectedOption.moneyReward.requireAdmin);
-            console.log('Has admin:', interaction.member.permissions.has(PermissionsBitField.Flags.Administrator));
+            const isAdmin = interaction.member.permissions.has(PermissionsBitField.Flags.Administrator);
+            console.log('Has admin:', isAdmin);
 
-            const hasPermission = selectedOption.moneyReward.requireAdmin ? 
-                interaction.member.permissions.has(PermissionsBitField.Flags.Administrator) :
-                selectedOption.moneyReward.allowedRoles.some(roleId => interaction.member.roles.cache.has(roleId));
+            const hasAllowedRole = selectedOption.moneyReward.allowedRoles.some(roleId => 
+                interaction.member.roles.cache.has(roleId)
+            );
+            const hasPermission = isAdmin || hasAllowedRole;
 
             console.log('✅ Has permission:', hasPermission);
 
             if (!hasPermission) {
                 console.log('❌ Permission denied');
                 await interaction.reply({
-                    content: '❌ You do not have permission to give this reward.',
+                    content: '❌ Nemáte oprávnění udělit tuto odměnu. Musíte být buď administrátor, nebo mít jednu z povolených rolí.',
                     ephemeral: true
                 });
                 return;

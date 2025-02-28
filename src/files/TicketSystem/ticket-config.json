@@ -44,6 +44,21 @@
                         "allowedRoles": [],
                         "requireAdmin": false
                     }
+                },
+                {
+                    "id": "random_images",
+                    "label": "Náhodný obrázek",
+                    "description": "Zobrazí náhodný obrázek ze složky",
+                    "type": "randomImage",
+                    "imageDirectory": "src/files/TicketSystem/images",
+                    "keepSelectable": true,
+                    "moneyReward": {
+                        "enabled": true,
+                        "amount": 1000,
+                        "buttonLabel": "Claim Reward",
+                        "allowedRoles": [],
+                        "requireAdmin": false
+                    }
                 }
             ]
         }
