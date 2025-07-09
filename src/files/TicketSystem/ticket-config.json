@@ -3,12 +3,12 @@
         {
             "id": "1",
             "label": "General Support",
-            "description": "General support tickets",
+            "description": "Obecný support tickets",
             "categoryId": "1213225816582914099",
             "archiveCategoryId": "1213225817447075901",
             "message": {
-                "title": "General Support Ticket",
-                "description": "Welcome to your support ticket!\nPlease describe your issue and wait for staff to assist you.",
+                "title": "Obecný Support Ticket",
+                "description": "Vítejte v support ticketu!\nProsím popište svůj problém a vyčkejte na odpověď od člena Administrátorského týmu.",
                 "color": "Blue",
                 "image": "https://devforum-uploads.s3.dualstack.us-east-2.amazonaws.com/uploads/original/4X/f/f/2/ff20770fed9cad55837fe1007a2874069ada45ff.png",
                 "thumbnail": "https://devforum-uploads.s3.dualstack.us-east-2.amazonaws.com/uploads/original/4X/f/f/2/ff20770fed9cad55837fe1007a2874069ada45ff.png"
@@ -40,7 +40,7 @@
                     "moneyReward": {
                         "enabled": true,
                         "amount": 1000,
-                        "buttonLabel": "Claim Reward",
+                        "buttonLabel": "Přijmout odměnu",
                         "allowedRoles": [],
                         "requireAdmin": false
                     }
@@ -61,6 +61,127 @@
                     }
                 }
             ]
+        },
+        {
+            "id": "2",
+            "label": "Krádež | Zničení vozidla",
+            "description": "Krádež | Zničení vozidla tickets",
+            "categoryId": "1241290394881228881",
+            "archiveCategoryId": "1241290462581624832",
+            "message": {
+                "title": "Krádež | Zničení vozidla Ticket",
+                "description": "Vítejte v Krádež | Zničení vozidla ticketu!\nProsím popište vše potřebné a vyčkejte na odpověď od člena Administrátorského týmu.",
+                "color": "Purple",
+                "image": "https://devforum-uploads.s3.dualstack.us-east-2.amazonaws.com/uploads/original/4X/f/f/2/ff20770fed9cad55837fe1007a2874069ada45ff.png",
+                "thumbnail": "https://devforum-uploads.s3.dualstack.us-east-2.amazonaws.com/uploads/original/4X/f/f/2/ff20770fed9cad55837fe1007a2874069ada45ff.png"
+            },
+            "hideMenuAfterSelection": true,
+            "responseOptions": [
+                {
+                    "id": "steal_1",
+                    "label": "Krádež techniky",
+                    "description": "",
+                    "type": "text",
+                    "content": "Prosíme o doložení důkazů o krádeži techniky.\n1. videozáznam z přestřelky \n2. fotografie z auta",
+                    "keepSelectable": false,
+                    "moneyReward": {
+                        "enabled": false,
+                        "amount": 0,
+                        "buttonLabel": "test",
+                        "allowedRoles": ["1226928552558067723"],
+                        "requireAdmin": true
+                    }
+                },
+                {
+                    "id": "destroy_1",
+                    "label": "Zničení techniky",
+                    "description": "",
+                    "type": "text",
+                    "content": "Prosíme o doložení důkazů o zničení techniky.\n1. videozáznam ze zničení",
+                    "keepSelectable": false,
+                    "moneyReward": {
+                        "enabled": false,
+                        "amount": 0,
+                        "buttonLabel": "test",
+                        "allowedRoles": ["1226928552558067723"],
+                        "requireAdmin": true
+                    }
+                }
+            ]
+        },
+        {
+            "id": "3",
+            "label": "Raid Ticket",
+            "description": "Raid tickets",
+            "categoryId": "1213225816876646443",
+            "archiveCategoryId": "1213225818352787513",
+            "message": {
+                "title": "Raid Ticket",
+                "description": "Vítejte v Raid ticketu!\nProsím vypište důvody k raidu, jeho čas, fotografii nepřátelské základny z její blízkosti a vyčkejte na odpověď od člena Administrátorského týmu.\n důvody k raidu musí být platné a doložené důkazy.",
+                "color": "White",
+                "image": "https://devforum-uploads.s3.dualstack.us-east-2.amazonaws.com/uploads/original/4X/f/f/2/ff20770fed9cad55837fe1007a2874069ada45ff.png",
+                "thumbnail": "https://devforum-uploads.s3.dualstack.us-east-2.amazonaws.com/uploads/original/4X/f/f/2/ff20770fed9cad55837fe1007a2874069ada45ff.png"
+            }
+        },
+        {
+            "id": "4",
+            "label": "Character Kill Ticket",
+            "description": "Ticket na zabití RP postavy hráče",
+            "categoryId": "1213225816876646444",
+            "archiveCategoryId": "1213225818352787514",
+            "message": {
+                "title": "Character Kill Ticket",
+                "description": "Vítejte v Character Kill ticketu!\nVypište důvody k zabití RP postavy hráče (min. 3) a vyčkejte na odpověď od člena Administrátorského týmu.\nDůvody musí být platné a musí být IC.",
+                "color": "Red",
+                "image": "https://devforum-uploads.s3.dualstack.us-east-2.amazonaws.com/uploads/original/4X/f/f/2/ff20770fed9cad55837fe1007a2874069ada45ff.png",
+                "thumbnail": "https://devforum-uploads.s3.dualstack.us-east-2.amazonaws.com/uploads/original/4X/f/f/2/ff20770fed9cad55837fe1007a2874069ada45ff.png"
+            },
+            "hideMenuAfterSelection": true,
+            "responseOptions": [
+                {
+                    "id": "ck_1",
+                    "label": "Situační zabití RP postavy",
+                    "description": "Viděl jste hráče skočit z mostu a zabít se, nebo jste ho viděli v situaci, kdy by bylo logické že ji nepřežije.",
+                    "type": "text",
+                    "content": "Prosíme o doložení důkazů k zabití RP postavy hráče.\n1. Váš popis jak se situace odehrála\n2. Screenshoty ze situace\n3. Videozáznam ze situace",
+                    "keepSelectable": false,
+                    "moneyReward": {
+                        "enabled": false,
+                        "amount": 0,
+                        "buttonLabel": "test",
+                        "allowedRoles": ["1226928552558067723"],
+                        "requireAdmin": true
+                    }
+                }
+            ]
+        },
+        {
+            "id": "5",
+            "label": "Frakční Ticket",
+            "description": "Změny ve frakčním systému",
+            "categoryId": "1213225816201240595",
+            "archiveCategoryId": "1213225816876646447",
+            "message": {
+                "title": "Frakční Ticket",
+                "description": "Vítejte ve Frakčním ticketu!\nProsím vyčkejte na odpověď od člena Administrátorského týmu.",
+                "color": "Green",
+                "image": "https://devforum-uploads.s3.dualstack.us-east-2.amazonaws.com/uploads/original/4X/f/f/2/ff20770fed9cad55837fe1007a2874069ada45ff.png",
+                "thumbnail": "https://devforum-uploads.s3.dualstack.us-east-2.amazonaws.com/uploads/original/4X/f/f/2/ff20770fed9cad55837fe1007a2874069ada45ff.png"
+            }
+        },
+        {
+            "id": "6",
+            "label": "Report Ticket",
+            "description": "",
+            "categoryId": "1213225816582914103",
+            "archiveCategoryId": "1213225817711185938",
+            "message": {
+                "title": "Report Ticket",
+                "description": "Vítejte v Report ticketu!\nProsím vypište vše potřebné k reportu a vyčkejte na odpověď od člena Administrátorského týmu.\n\n1. Roblox nick hráče, kterého reportujete\n2. Videozáznam ze situace\n3. Popis situace vámi (co podle vás bylo porušeno)",
+                "color": "Cyan",
+                "image": "https://devforum-uploads.s3.dualstack.us-east-2.amazonaws.com/uploads/original/4X/f/f/2/ff20770fed9cad55837fe1007a2874069ada45ff.png",
+                "thumbnail": "https://devforum-uploads.s3.dualstack.us-east-2.amazonaws.com/uploads/original/4X/f/f/2/ff20770fed9cad55837fe1007a2874069ada45ff.png"
+            }
         }
     ],
     "buttons": {
