@@ -172,7 +172,7 @@
         {
             "id": "6",
             "label": "Report Ticket",
-            "description": "",
+            "description": "Ticket pro hlášení porušení pravidel",
             "categoryId": "1213225816582914103",
             "archiveCategoryId": "1213225817711185938",
             "message": {
