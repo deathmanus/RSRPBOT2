@@ -9,11 +9,10 @@ class TicketHandler {
     static async handleTicketCreate(interaction) {
         const config = JSON.parse(fs.readFileSync(path.join(__dirname, '../../files/TicketSystem/ticket-config.json'), 'utf-8'));
         const category = config.categories.find(c => c.id === interaction.values[0]);
-        
         if (!category) return;
 
         const channel = await interaction.guild.channels.create({
-            name: `ticket-${interaction.user.username}-${interaction.user.id}`, // Přidáno ID uživatele do názvu
+            name: `ticket-${interaction.user.username}-${interaction.user.id}`,
             type: ChannelType.GuildText,
             parent: category.categoryId,
             permissionOverwrites: [
@@ -57,24 +56,32 @@ class TicketHandler {
                     .setEmoji(config.buttons.archive.emoji)
             );
 
-        const responseMenu = new ActionRowBuilder()
-            .addComponents(
-                new StringSelectMenuBuilder()
-                    .setCustomId('ticket_response')
-                    .setPlaceholder('Select a response')
-                    .addOptions(
-                        category.responseOptions.map(option => ({
-                            label: option.label,
-                            description: option.description,
-                            value: option.id
-                        }))
-                    )
-            );
+        // Filter out blank or incomplete responseOptions
+        const validOptions = (Array.isArray(category.responseOptions) ? category.responseOptions : [])
+            .filter(option => option && option.id && option.label && option.description);
+
+        let components = [buttons];
+        if (validOptions.length > 0) {
+            const responseMenu = new ActionRowBuilder()
+                .addComponents(
+                    new StringSelectMenuBuilder()
+                        .setCustomId('ticket_response')
+                        .setPlaceholder('Select a response')
+                        .addOptions(
+                            validOptions.map(option => ({
+                                label: option.label,
+                                description: option.description,
+                                value: option.id
+                            }))
+                        )
+                );
+            components = [responseMenu, buttons];
+        }
 
         await channel.send({ 
             content: `<@${interaction.user.id}>`,
             embeds: [embed],
-            components: [responseMenu, buttons]
+            components
         });
 
         // Initialize rewards tracking for this channel

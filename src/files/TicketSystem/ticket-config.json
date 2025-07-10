@@ -17,8 +17,8 @@
             "responseOptions": [
                 {
                     "id": "help_1",
-                    "label": "Často kladené otázky",
-                    "description": "Základní informace a odpovědi",
+                    "label": "Časté otázky",
+                    "description": "Základní info a odpovědi",
                     "type": "text",
                     "content": "Zde jsou často kladené otázky a odpovědi:\n1. Otázka 1...\n2. Otázka 2...",
                     "keepSelectable": true,
@@ -32,8 +32,8 @@
                 },
                 {
                     "id": "help_2",
-                    "label": "Návod k použití",
-                    "description": "Obrazový průvodce",
+                    "label": "Návod",
+                    "description": "Průvodce obrázky",
                     "type": "image",
                     "content": "https://devforum-uploads.s3.dualstack.us-east-2.amazonaws.com/uploads/original/4X/f/f/2/ff20770fed9cad55837fe1007a2874069ada45ff.png",
                     "keepSelectable": false,
@@ -48,7 +48,7 @@
                 {
                     "id": "random_images",
                     "label": "Náhodný obrázek",
-                    "description": "Zobrazí náhodný obrázek ze složky",
+                    "description": "Náhodný obrázek složky",
                     "type": "randomImage",
                     "imageDirectory": "src/files/TicketSystem/images",
                     "keepSelectable": true,
@@ -80,7 +80,7 @@
                 {
                     "id": "steal_1",
                     "label": "Krádež techniky",
-                    "description": "",
+                    "description": "Krádež techniky ticket",
                     "type": "text",
                     "content": "Prosíme o doložení důkazů o krádeži techniky.\n1. videozáznam z přestřelky \n2. fotografie z auta",
                     "keepSelectable": false,
@@ -95,7 +95,7 @@
                 {
                     "id": "destroy_1",
                     "label": "Zničení techniky",
-                    "description": "",
+                    "description": "Zničení techniky ticket",
                     "type": "text",
                     "content": "Prosíme o doložení důkazů o zničení techniky.\n1. videozáznam ze zničení",
                     "keepSelectable": false,
@@ -122,6 +122,8 @@
                 "image": "https://devforum-uploads.s3.dualstack.us-east-2.amazonaws.com/uploads/original/4X/f/f/2/ff20770fed9cad55837fe1007a2874069ada45ff.png",
                 "thumbnail": "https://devforum-uploads.s3.dualstack.us-east-2.amazonaws.com/uploads/original/4X/f/f/2/ff20770fed9cad55837fe1007a2874069ada45ff.png"
             }
+            ,
+            "responseOptions": []
         },
         {
             "id": "4",
@@ -140,8 +142,8 @@
             "responseOptions": [
                 {
                     "id": "ck_1",
-                    "label": "Situační zabití RP postavy",
-                    "description": "Viděl jste hráče skočit z mostu a zabít se, nebo jste ho viděli v situaci, kdy by bylo logické že ji nepřežije.",
+                    "label": "Situační CK postavy",
+                    "description": "Logická smrt postavy",
                     "type": "text",
                     "content": "Prosíme o doložení důkazů k zabití RP postavy hráče.\n1. Váš popis jak se situace odehrála\n2. Screenshoty ze situace\n3. Videozáznam ze situace",
                     "keepSelectable": false,
@@ -168,20 +170,23 @@
                 "image": "https://devforum-uploads.s3.dualstack.us-east-2.amazonaws.com/uploads/original/4X/f/f/2/ff20770fed9cad55837fe1007a2874069ada45ff.png",
                 "thumbnail": "https://devforum-uploads.s3.dualstack.us-east-2.amazonaws.com/uploads/original/4X/f/f/2/ff20770fed9cad55837fe1007a2874069ada45ff.png"
             }
+            
         },
         {
             "id": "6",
             "label": "Report Ticket",
-            "description": "Ticket pro hlášení porušení pravidel",
+            "description": "Reportovací ticket",
             "categoryId": "1213225816582914103",
             "archiveCategoryId": "1213225817711185938",
             "message": {
                 "title": "Report Ticket",
                 "description": "Vítejte v Report ticketu!\nProsím vypište vše potřebné k reportu a vyčkejte na odpověď od člena Administrátorského týmu.\n\n1. Roblox nick hráče, kterého reportujete\n2. Videozáznam ze situace\n3. Popis situace vámi (co podle vás bylo porušeno)",
-                "color": "Cyan",
+                "color": "Red",
                 "image": "https://devforum-uploads.s3.dualstack.us-east-2.amazonaws.com/uploads/original/4X/f/f/2/ff20770fed9cad55837fe1007a2874069ada45ff.png",
                 "thumbnail": "https://devforum-uploads.s3.dualstack.us-east-2.amazonaws.com/uploads/original/4X/f/f/2/ff20770fed9cad55837fe1007a2874069ada45ff.png"
             }
+            ,
+            "responseOptions": []
         }
     ],
     "buttons": {
