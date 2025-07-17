@@ -1,6 +1,6 @@
 {
     "name": "CH-53D Sea Stallion",
-    "basePrice": 20000,
+    "basePrice": 13,
     "type": "modifiable",
     "modifications": {
         "Camo": [
@@ -11,11 +11,11 @@
         ],
         "GunRight": [
             { "name": "No weapon", "price": 0 },
-            { "name": "GAU-21", "price": 2000 }
+            { "name": "GAU-21", "price": 2 }
         ],
         "GunLeft": [
             { "name": "No weapon", "price": 0 },
-            { "name": "GAU-21", "price": 2000 }
+            { "name": "GAU-21", "price": 2 }
         ]
     }
 }

@@ -1,6 +1,6 @@
 {
     "name": "M1038",
-    "basePrice": 1900,
+    "basePrice": 4,
     "type": "modifiable",
     "modifications": {
         "Camo": [
@@ -16,8 +16,8 @@
                 "subOptions": {
                     "Weapons": [
                         { "name": "No weapon", "price": 0},
-                        { "name": "M6 pedestral mount (M2A1)", "price": 2000 },
-                        { "name": "M6 pedestral mount (M240B)", "price": 1150 }
+                        { "name": "M6 pedestral mount (M2A1)", "price": 3 },
+                        { "name": "M6 pedestral mount (M240B)", "price": 2 }
                     ]
                 }
             },
@@ -27,36 +27,36 @@
 
             {
                 "name": "Open-Cargo",
-                "price": 250,
+                "price": 1,
                 "subOptions": {
                     "Weapons": [
                         { "name": "No weapon", "price": 0},
-                        { "name": "M6 pedestral mount (M2A1)", "price": 2000 },
-                        { "name": "M6 pedestral mount (M240B)", "price": 1150 }
+                        { "name": "M6 pedestral mount (M2A1)", "price": 3 },
+                        { "name": "M6 pedestral mount (M240B)", "price": 2 }
                     ]
                 }
             },
 
             {
                 "name": "Armored-Up",
-                "price": 800,
+                "price": 3,
                 "subOptions": {
                     "Weapons": [
                         { "name": "No weapon", "price": 0},
-                        { "name": "M6 pedestral mount (M2A1)", "price": 2000 },
-                        { "name": "M6 pedestral mount (M240B)", "price": 1150 }
+                        { "name": "M6 pedestral mount (M2A1)", "price": 3 },
+                        { "name": "M6 pedestral mount (M240B)", "price": 2 }
                     ]
                 }
             },
 
             {
                 "name": "Open-Transport",
-                "price": 100,
+                "price": 1,
                 "subOptions": {
                     "Weapons": [
                         { "name": "No weapon", "price": 0},
-                        { "name": "M6 pedestral mount (M2A1)", "price": 2000 },
-                        { "name": "M6 pedestral mount (M240B)", "price": 1150 }
+                        { "name": "M6 pedestral mount (M2A1)", "price": 3 },
+                        { "name": "M6 pedestral mount (M240B)", "price": 2 }
                     ]
                 }
             },
@@ -67,18 +67,18 @@
                 "subOptions": {
                     "Weapons": [
                         { "name": "No weapon", "price": 0},
-                        { "name": "M6 pedestral mount (M2A1)", "price": 2000 },
-                        { "name": "M6 pedestral mount (M240B)", "price": 1150 }
+                        { "name": "M6 pedestral mount (M2A1)", "price": 3 },
+                        { "name": "M6 pedestral mount (M240B)", "price": 2 }
                     ]
                 }
             }
         ],
         "Detail": [
             { "name": "Kit A", "price": 0 },
-            { "name": "Kit B", "price": 100 },
-            { "name": "Kit C", "price": 100 },
-            { "name": "Kit D", "price": 100 },
-            { "name": "Kit E", "price": 100 }
+            { "name": "Kit B", "price": 1 },
+            { "name": "Kit C", "price": 1 },
+            { "name": "Kit D", "price": 1 },
+            { "name": "Kit E", "price": 1 }
         ]
     }
 }

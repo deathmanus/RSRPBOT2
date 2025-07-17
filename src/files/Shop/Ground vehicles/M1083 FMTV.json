@@ -1,6 +1,6 @@
 {
     "name": "M1083 FMTV",
-    "basePrice": 5900,
+    "basePrice": 8,
     "type": "modifiable",
     "modifications": {
         "Camo": [
@@ -11,22 +11,22 @@
         ],
         "Config": [
             { "name": "M1083A1P2", "price": 0 },
-            { "name": "M1083A1P2 (cargo)", "price": 100 },
-            { "name": "M1083A1P2-B (cargo)", "price": 2500 },
-            { "name": "M1083A1P2-B", "price": 2500 }
+            { "name": "M1083A1P2 (cargo)", "price": 0 },
+            { "name": "M1083A1P2-B (cargo)", "price": 2 },
+            { "name": "M1083A1P2-B", "price": 2 }
         ],
         "Roof": [
             { "name": "HMMWV weapon station (hatch cover)", "price": 0 },
-            { "name": "HMMWV weapon station (M2A1)", "price": 2400 },
-            { "name": "HMMWV weapon station (M240B)", "price": 1000 },
-            { "name": "O-GPK (M240B)", "price": 2500 },
-            { "name": "O-GPK (M240B with overhead protection)", "price": 3000 },
-            { "name": "O-GPK (M2A1)", "price": 3000 },
-            { "name": "O-GPK (M2A1 with overhead protection)", "price": 3500 }
+            { "name": "HMMWV weapon station (M2A1)", "price": 2 },
+            { "name": "HMMWV weapon station (M240B)", "price": 1 },
+            { "name": "O-GPK (M240B)", "price": 3 },
+            { "name": "O-GPK (M240B with overhead protection)", "price": 4 },
+            { "name": "O-GPK (M2A1)", "price": 4 },
+            { "name": "O-GPK (M2A1 with overhead protection)", "price": 5 }
         ],
         "Canopy": [
             { "name": "N/A", "price": 0 },
-            { "name": "FMTV cargo cover kit", "price": 100 }
+            { "name": "FMTV cargo cover kit", "price": 0 }
         ]
     }
 }

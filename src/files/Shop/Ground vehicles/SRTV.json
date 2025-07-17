@@ -1,6 +1,6 @@
 {
-    "name": "4x4",
-    "basePrice": 4,
+    "name": "SRTV Recon Vehicle (VIP+ Only)",
+    "basePrice": 3,
     "type": "modifiable",
     "modifications": {
         "Camo": [
@@ -11,7 +11,7 @@
             { "name": "Light", "price": 0 },
             { 
                 "name": "Heavy",
-                "price": 2,
+                "price": 1,
                 "subOptions": {
                     "Back": [
                         { "name": "No weapon", "price": 0},

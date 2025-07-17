@@ -1,8 +1,8 @@
 {
     "name": "Optika s 1x-2x přiblížením",
     "type": "countable",
-    "basePrice": 200,
+    "basePrice": 2,
     "maxCount": 50,
     "minCount": 1,
-    "description": "Příkaz k nákupu jaké-koliv optiky s 1x-2x přiblížením."
+    "description": "Licence k nákupu jaké-koliv optiky s 1x-2x přiblížením.\n (stačí vlastnit jednu licenci k tomu aby členové frakce mohli používat dané optiky)"
 }

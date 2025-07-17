@@ -1,6 +1,6 @@
 {
     "name": "UH-60V Black Hawk",
-    "basePrice": 14750,
+    "basePrice": 13,
     "type": "modifiable",
     "modifications": {
         "Camo": [
@@ -8,15 +8,15 @@
         ],
         "Config": [
             { "name": "Stock", "price": 0 },
-            { "name": "FRIES bar", "price": 2750 }
+            { "name": "FRIES bar", "price": 1 }
         ],
         "GunRight": [
             { "name": "No weapon", "price": 0 },
-            { "name": "M240H", "price": 2000 }
+            { "name": "M240H", "price": 3 }
         ],
         "GunLeft": [
             { "name": "No weapon", "price": 0 },
-            { "name": "M240H", "price": 2000 }
+            { "name": "M240H", "price": 3 }
         ]
     }
 }

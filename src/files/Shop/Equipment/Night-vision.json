@@ -1,0 +1,8 @@
+{
+    "name": "Night Vision",
+    "type": "countable",
+    "basePrice": 2,
+    "maxCount": 50,
+    "minCount": 1,
+    "description": "Attachment na helmu.\n (Pro každého člena musí být koupen 1 kus)"
+}

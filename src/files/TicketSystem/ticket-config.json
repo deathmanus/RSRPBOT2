@@ -11,56 +11,10 @@
                 "description": "Vítejte v support ticketu!\nProsím popište svůj problém a vyčkejte na odpověď od člena Administrátorského týmu.",
                 "color": "Blue",
                 "image": "https://devforum-uploads.s3.dualstack.us-east-2.amazonaws.com/uploads/original/4X/f/f/2/ff20770fed9cad55837fe1007a2874069ada45ff.png",
-                "thumbnail": "https://devforum-uploads.s3.dualstack.us-east-2.amazonaws.com/uploads/original/4X/f/f/2/ff20770fed9cad55837fe1007a2874069ada45ff.png"
+                "thumbnail": "src/files/TicketSystem/images/logo.png"
             },
             "hideMenuAfterSelection": true,
-            "responseOptions": [
-                {
-                    "id": "help_1",
-                    "label": "Časté otázky",
-                    "description": "Základní info a odpovědi",
-                    "type": "text",
-                    "content": "Zde jsou často kladené otázky a odpovědi:\n1. Otázka 1...\n2. Otázka 2...",
-                    "keepSelectable": true,
-                    "moneyReward": {
-                        "enabled": true,
-                        "amount": 9999,
-                        "buttonLabel": "test",
-                        "allowedRoles": ["1226928552558067723"],
-                        "requireAdmin": true
-                    }
-                },
-                {
-                    "id": "help_2",
-                    "label": "Návod",
-                    "description": "Průvodce obrázky",
-                    "type": "image",
-                    "content": "https://devforum-uploads.s3.dualstack.us-east-2.amazonaws.com/uploads/original/4X/f/f/2/ff20770fed9cad55837fe1007a2874069ada45ff.png",
-                    "keepSelectable": false,
-                    "moneyReward": {
-                        "enabled": true,
-                        "amount": 1000,
-                        "buttonLabel": "Přijmout odměnu",
-                        "allowedRoles": [],
-                        "requireAdmin": false
-                    }
-                },
-                {
-                    "id": "random_images",
-                    "label": "Náhodný obrázek",
-                    "description": "Náhodný obrázek složky",
-                    "type": "randomImage",
-                    "imageDirectory": "src/files/TicketSystem/images",
-                    "keepSelectable": true,
-                    "moneyReward": {
-                        "enabled": true,
-                        "amount": 1000,
-                        "buttonLabel": "Claim Reward",
-                        "allowedRoles": [],
-                        "requireAdmin": false
-                    }
-                }
-            ]
+            "responseOptions": []
         },
         {
             "id": "2",
@@ -73,7 +27,7 @@
                 "description": "Vítejte v Krádež | Zničení vozidla ticketu!\nProsím popište vše potřebné a vyčkejte na odpověď od člena Administrátorského týmu.",
                 "color": "Purple",
                 "image": "https://devforum-uploads.s3.dualstack.us-east-2.amazonaws.com/uploads/original/4X/f/f/2/ff20770fed9cad55837fe1007a2874069ada45ff.png",
-                "thumbnail": "https://devforum-uploads.s3.dualstack.us-east-2.amazonaws.com/uploads/original/4X/f/f/2/ff20770fed9cad55837fe1007a2874069ada45ff.png"
+                "thumbnail": "src/files/TicketSystem/images/logo.png"
             },
             "hideMenuAfterSelection": true,
             "responseOptions": [
@@ -120,7 +74,7 @@
                 "description": "Vítejte v Raid ticketu!\nProsím vypište důvody k raidu, jeho čas, fotografii nepřátelské základny z její blízkosti a vyčkejte na odpověď od člena Administrátorského týmu.\n důvody k raidu musí být platné a doložené důkazy.",
                 "color": "White",
                 "image": "https://devforum-uploads.s3.dualstack.us-east-2.amazonaws.com/uploads/original/4X/f/f/2/ff20770fed9cad55837fe1007a2874069ada45ff.png",
-                "thumbnail": "https://devforum-uploads.s3.dualstack.us-east-2.amazonaws.com/uploads/original/4X/f/f/2/ff20770fed9cad55837fe1007a2874069ada45ff.png"
+                "thumbnail": "src/files/TicketSystem/images/logo.png"
             }
             ,
             "responseOptions": []
@@ -136,7 +90,7 @@
                 "description": "Vítejte v Character Kill ticketu!\nVypište důvody k zabití RP postavy hráče (min. 3) a vyčkejte na odpověď od člena Administrátorského týmu.\nDůvody musí být platné a musí být IC.",
                 "color": "Red",
                 "image": "https://devforum-uploads.s3.dualstack.us-east-2.amazonaws.com/uploads/original/4X/f/f/2/ff20770fed9cad55837fe1007a2874069ada45ff.png",
-                "thumbnail": "https://devforum-uploads.s3.dualstack.us-east-2.amazonaws.com/uploads/original/4X/f/f/2/ff20770fed9cad55837fe1007a2874069ada45ff.png"
+                "thumbnail": "src/files/TicketSystem/images/logo.png"
             },
             "hideMenuAfterSelection": true,
             "responseOptions": [
@@ -168,7 +122,7 @@
                 "description": "Vítejte ve Frakčním ticketu!\nProsím vyčkejte na odpověď od člena Administrátorského týmu.",
                 "color": "Green",
                 "image": "https://devforum-uploads.s3.dualstack.us-east-2.amazonaws.com/uploads/original/4X/f/f/2/ff20770fed9cad55837fe1007a2874069ada45ff.png",
-                "thumbnail": "https://devforum-uploads.s3.dualstack.us-east-2.amazonaws.com/uploads/original/4X/f/f/2/ff20770fed9cad55837fe1007a2874069ada45ff.png"
+                "thumbnail": "src/files/TicketSystem/images/logo.png"
             }
             
         },
@@ -183,7 +137,7 @@
                 "description": "Vítejte v Report ticketu!\nProsím vypište vše potřebné k reportu a vyčkejte na odpověď od člena Administrátorského týmu.\n\n1. Roblox nick hráče, kterého reportujete\n2. Videozáznam ze situace\n3. Popis situace vámi (co podle vás bylo porušeno)",
                 "color": "Red",
                 "image": "https://devforum-uploads.s3.dualstack.us-east-2.amazonaws.com/uploads/original/4X/f/f/2/ff20770fed9cad55837fe1007a2874069ada45ff.png",
-                "thumbnail": "https://devforum-uploads.s3.dualstack.us-east-2.amazonaws.com/uploads/original/4X/f/f/2/ff20770fed9cad55837fe1007a2874069ada45ff.png"
+                "thumbnail": "src/files/TicketSystem/images/logo.png"
             }
             ,
             "responseOptions": []

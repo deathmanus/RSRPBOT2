@@ -1,8 +1,0 @@
-{
-    "name": "Silencer",
-    "type": "countable",
-    "basePrice": 100,
-    "maxCount": 50,
-    "minCount": 1,
-    "description": "Attachment na zbraň."
-}

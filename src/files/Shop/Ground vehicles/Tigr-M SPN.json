@@ -1,11 +1,11 @@
 {
     "name": "Tigr-M SPN",
-    "basePrice": 2500,
+    "basePrice": 5,
     "type": "modifiable",
     "modifications": {
         "Camo": [
             { "name": "Protective green", "price": 0 },
-            { "name": "Protective Woodlant mix", "price": 250 }
+            { "name": "Protective Woodlant mix", "price": 0 }
         ],
         "Config": [
             { 
@@ -14,35 +14,35 @@
                 "subOptions": {
                     "Roof": [
                         { "name": "None", "price": 0 },
-                        { "name": "PKP", "price": 1000 },
-                        { "name": "PKP + gunner protection", "price": 2500 },
-                        { "name": "6P49", "price": 1500 },
-                        { "name": "6P49 + gunner protection", "price": 3400 }
+                        { "name": "PKP", "price": 1 },
+                        { "name": "PKP + gunner protection", "price": 2 },
+                        { "name": "6P49", "price": 2 },
+                        { "name": "6P49 + gunner protection", "price": 3 }
                     ]
                 }
             },
 
             {
                 "name": "AMN upgrade",
-                "price": 500,
+                "price": 2,
                 "subOptions": {
                     "Roof": [
                         { "name": "None", "price": 0 },
-                        { "name": "PKP", "price": 1000 },
-                        { "name": "PKP + gunner protection", "price": 2500 },
-                        { "name": "6P49", "price": 1500 },
-                        { "name": "6P49 + gunner protection", "price": 3400 }
+                        { "name": "PKP", "price": 1 },
+                        { "name": "PKP + gunner protection", "price": 2 },
+                        { "name": "6P49", "price": 2 },
+                        { "name": "6P49 + gunner protection", "price": 3 }
                     ]
                 }
             },
 
-            { "name": "STS troops", "price": 200 },
-            { "name": "AMN troops upgrade", "price": 700 }
+            { "name": "STS troops", "price": 0 },
+            { "name": "AMN troops upgrade", "price": 1 }
         ],
         "Extra": [
             { "name": "N/A", "price": 0 },
-            { "name": "Assault kit", "price": 350 },
-            { "name": "Communications kit", "price": 450 }
+            { "name": "Assault kit", "price": 1 },
+            { "name": "Communications kit", "price": 1 }
         ]
     }
 }

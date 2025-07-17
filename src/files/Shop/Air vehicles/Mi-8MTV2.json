@@ -1,0 +1,41 @@
+{
+    "name": "NH90 TTH",
+    "basePrice": 11,
+    "type": "modifiable",
+    "modifications": {
+        "Camo": [
+            { "name": "Summer (Air Force)", "price": 0 },
+            { "name": "Summer (Navy)", "price": 0 },
+            { "name": "Gray (Air Force)", "price": 0 },
+            { "name": "Gray (Navy)", "price": 0 }
+        ],
+        "Config": [
+            { "name": "Stock", "price": 0 },
+            { "name": "Cargo Transport", "price": 1 },
+            { "name": "Fast-roping system", "price": 1 }
+        ],
+        "Radar": [
+            { "name": "N/A", "price": 0 },
+            { "name": "Radar", "price": 2 }
+        ],
+        "Countermeasures": [
+            { "name": "N/A", "price": 0 },
+            { "name": "Tail countermeasures", "price": 0 },
+            { "name": "Window countermeasures", "price": 0 }
+        ],
+        "Pylon": [
+            { "name": "N/A", "price": 0 },
+            { "name": "Mount", "price": 0 }
+        ],
+        "Armor": [
+            { "name": "N/A", "price": 0 },
+            { "name": "Armor plating", "price": 1}
+        ],
+        "DoorLeft": [
+            { "name": "N/A", "price": 0 },
+            { "name": "Stair only", "price": 0 },
+            { "name": "Door", "price": 0 },
+            { "name": "PKP", "price": 3 }
+        ]
+    }
+}
