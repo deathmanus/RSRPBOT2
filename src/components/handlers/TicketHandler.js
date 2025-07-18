@@ -35,11 +35,36 @@ class TicketHandler {
             .setDescription(category.message.description)
             .setColor(category.message.color);
 
+        // Handle image - check if it's a URL or local file
         if (category.message.image) {
-            embed.setImage(category.message.image);
+            try {
+                new URL(category.message.image);
+                // It's a valid URL
+                embed.setImage(category.message.image);
+            } catch {
+                // It's not a URL, try to load as local file
+                const imagePath = path.join(__dirname, '../../files/TicketSystem/images', category.message.image);
+                if (fs.existsSync(imagePath)) {
+                    embed.setImage(`attachment://${category.message.image}`);
+                }
+                // If file doesn't exist, simply don't set any image
+            }
         }
+
+        // Handle thumbnail - check if it's a URL or local file
         if (category.message.thumbnail) {
-            embed.setThumbnail(category.message.thumbnail);
+            try {
+                new URL(category.message.thumbnail);
+                // It's a valid URL
+                embed.setThumbnail(category.message.thumbnail);
+            } catch {
+                // It's not a URL, try to load as local file
+                const thumbnailPath = path.join(__dirname, '../../files/TicketSystem/images', category.message.thumbnail);
+                if (fs.existsSync(thumbnailPath)) {
+                    embed.setThumbnail(`attachment://${category.message.thumbnail}`);
+                }
+                // If file doesn't exist, simply don't set any thumbnail
+            }
         }
 
         const buttons = new ActionRowBuilder()
@@ -78,11 +103,39 @@ class TicketHandler {
             components = [responseMenu, buttons];
         }
 
-        await channel.send({ 
+        // Prepare files array for local images
+        const files = [];
+        if (category.message.image && !category.message.image.startsWith('http')) {
+            const imagePath = path.join(__dirname, '../../files/TicketSystem/images', category.message.image);
+            if (fs.existsSync(imagePath)) {
+                files.push({
+                    attachment: imagePath,
+                    name: category.message.image
+                });
+            }
+        }
+        if (category.message.thumbnail && !category.message.thumbnail.startsWith('http')) {
+            const thumbnailPath = path.join(__dirname, '../../files/TicketSystem/images', category.message.thumbnail);
+            if (fs.existsSync(thumbnailPath)) {
+                files.push({
+                    attachment: thumbnailPath,
+                    name: category.message.thumbnail
+                });
+            }
+        }
+
+        const messageOptions = { 
             content: `<@${interaction.user.id}>`,
             embeds: [embed],
             components
-        });
+        };
+
+        // Add files if any local images exist
+        if (files.length > 0) {
+            messageOptions.files = files;
+        }
+
+        await channel.send(messageOptions);
 
         // Initialize rewards tracking for this channel
         this.rewardsClaimed.set(channel.id, new Set());
@@ -237,13 +290,39 @@ class TicketHandler {
 
             // Handle different response types
             if (selectedOption.type === 'image') {
-                new URL(selectedOption.content);
-                response.setImage(selectedOption.content);
-                await interaction.reply({
-                    embeds: [response],
-                    components: components,
-                    ephemeral: false
-                });
+                try {
+                    new URL(selectedOption.content);
+                    // It's a valid URL
+                    response.setImage(selectedOption.content);
+                    await interaction.reply({
+                        embeds: [response],
+                        components: components,
+                        ephemeral: false
+                    });
+                } catch {
+                    // It's not a URL, try to load as local file
+                    const imagePath = path.join(__dirname, '../../files/TicketSystem/images', selectedOption.content);
+                    if (fs.existsSync(imagePath)) {
+                        response.setImage(`attachment://${selectedOption.content}`);
+                        await interaction.reply({
+                            embeds: [response],
+                            files: [{
+                                attachment: imagePath,
+                                name: selectedOption.content
+                            }],
+                            components: components,
+                            ephemeral: false
+                        });
+                    } else {
+                        // File doesn't exist, send without image
+                        response.setDescription('Obrázek nebyl nalezen.');
+                        await interaction.reply({
+                            embeds: [response],
+                            components: components,
+                            ephemeral: false
+                        });
+                    }
+                }
             } else if (selectedOption.type === 'randomImage') {
                 const imageDir = path.join(__dirname, '../../files/TicketSystem/images');
                 console.log('📂 Checking directory:', imageDir);
