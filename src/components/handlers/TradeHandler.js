@@ -2,6 +2,17 @@ const { EmbedBuilder } = require('discord.js');
 const { getEmoji } = require('../../utils/emojiUtils');
 const fs = require('fs');
 const path = require('path');
+const { 
+    db, 
+    getTradeById, 
+    updateTradeStatus, 
+    updateFractionMoney, 
+    getFractionByName, 
+    deleteFractionItem, 
+    addFractionItem, 
+    getFractionItems,
+    addAuditLog
+} = require('../../Database/database');
 
 async function handleTradeResponse(interaction) {
     const [action, tradeId] = interaction.customId.split(':');
@@ -11,24 +22,30 @@ async function handleTradeResponse(interaction) {
     try {
         await interaction.deferUpdate();
 
-        const tradesPath = path.join(__dirname, '../../files/Trades');
-        const tradePath = path.join(tradesPath, `${tradeId}.json`);
-
-        if (!fs.existsSync(tradePath)) {
+        // Get trade data from database
+        let tradeData = null;
+        await new Promise((resolve) => {
+            getTradeById(tradeId, (err, trade) => {
+                if (!err && trade) {
+                    tradeData = trade;
+                }
+                resolve();
+            });
+        });
+        
+        if (!tradeData) {
             return await interaction.editReply({
                 content: `${getEmoji('error')} Tato obchodní nabídka již není platná.`,
                 components: []
             });
         }
-
-        const tradeData = JSON.parse(fs.readFileSync(tradePath, 'utf8'));
         
         if (!await checkFractionMembership(interaction, tradeData)) return;
 
         if (action === 'accept-trade') {
-            await processTrade(interaction, tradeData, tradePath);
+            await processTrade(interaction, tradeData, tradeId);
         } else {
-            await declineTrade(interaction, tradeData, tradePath);
+            await declineTrade(interaction, tradeData, tradeId);
         }
     } catch (error) {
         console.error('Error handling trade response:', error);
@@ -50,16 +67,48 @@ async function checkFractionMembership(interaction, tradeData) {
         });
         return false;
     }
+    
+    // Zkontrolovat, zda má oprávnění (velitel nebo zástupce)
+    if (!member.roles.cache.some(role => 
+        role.name.startsWith('Velitel') || role.name.startsWith('Zástupce')
+    )) {
+        await interaction.followUp({
+            content: `${getEmoji('error')} Nemáte oprávnění přijímat obchodní nabídky. Pouze velitelé a zástupci frakcí mohou používat tuto funkci.`,
+            ephemeral: true
+        });
+        return false;
+    }
+    
     return true;
 }
 
-async function processTrade(interaction, tradeData, tradePath) {
-    const buyerFractionPath = path.join(__dirname, '../../files/Fractions', tradeData.buyer, `${tradeData.buyer}.json`);
-    const sellerFractionPath = path.join(__dirname, '../../files/Fractions', tradeData.seller, `${tradeData.seller}.json`);
+async function processTrade(interaction, tradeData, tradeId) {
+    // Get fractions data
+    let buyerFractionData = null;
+    let sellerFractionData = null;
     
-    const buyerFractionData = JSON.parse(fs.readFileSync(buyerFractionPath, 'utf8'));
-    const sellerFractionData = JSON.parse(fs.readFileSync(sellerFractionPath, 'utf8'));
+    await new Promise((resolve) => {
+        getFractionByName(tradeData.buyer, (err, fraction) => {
+            buyerFractionData = fraction;
+            resolve();
+        });
+    });
+    
+    await new Promise((resolve) => {
+        getFractionByName(tradeData.seller, (err, fraction) => {
+            sellerFractionData = fraction;
+            resolve();
+        });
+    });
+    
+    if (!buyerFractionData || !sellerFractionData) {
+        return await interaction.followUp({
+            content: `${getEmoji('error')} Nastala chyba při načítání dat frakcí.`,
+            ephemeral: true
+        });
+    }
 
+    // Check if buyer has enough money
     if (buyerFractionData.money < tradeData.price) {
         return await interaction.followUp({
             content: `${getEmoji('error')} Vaše frakce nemá dostatek peněz (${tradeData.price} ${getEmoji('money')}).`,
@@ -67,129 +116,256 @@ async function processTrade(interaction, tradeData, tradePath) {
         });
     }
 
-    await transferTradeItems(tradeData);
-    
-    buyerFractionData.money -= tradeData.price;
-    sellerFractionData.money += tradeData.price;
-    
-    fs.writeFileSync(buyerFractionPath, JSON.stringify(buyerFractionData, null, 2));
-    fs.writeFileSync(sellerFractionPath, JSON.stringify(sellerFractionData, null, 2));
-
-    tradeData.status = 'accepted';
-    tradeData.acceptedBy = interaction.user.tag;
-    tradeData.acceptedAt = new Date().toISOString();
-    fs.writeFileSync(tradePath, JSON.stringify(tradeData, null, 2));
-
-    const updatedEmbed = EmbedBuilder.from(interaction.message.embeds[0])
-        .setColor(0x00FF00)
-        .setTitle(`${getEmoji('success')} Obchodní nabídka přijata`)
-        .addFields(
-            { name: 'Přijal', value: interaction.user.tag, inline: true },
-            { name: 'Stav peněz', value: `Prodávající: ${sellerFractionData.money} ${getEmoji('money')}\nKupující: ${buyerFractionData.money} ${getEmoji('money')}` }
+    try {
+        // Transfer items
+        await transferTradeItems(tradeData);
+        
+        // Update money for both fractions
+        await updateFractionMoney(buyerFractionData.id, tradeData.price, false); // odebrat peníze kupujícímu
+        await updateFractionMoney(sellerFractionData.id, tradeData.price, true); // přidat peníze prodávajícímu
+        
+        // Update fractions data for display
+        buyerFractionData.money -= tradeData.price;
+        sellerFractionData.money += tradeData.price;
+        
+        // Update trade status in database
+        await updateTradeStatus(tradeId, 'accepted', {
+            user: interaction.user.tag,
+            timestamp: new Date().toISOString()
+        });
+        
+        // Add audit log
+        addAuditLog(
+            interaction.user.id,
+            'accept_trade',
+            'trade',
+            tradeId,
+            JSON.stringify({
+                seller: tradeData.seller,
+                buyer: tradeData.buyer,
+                itemId: tradeData.id,
+                itemName: tradeData.name,
+                count: tradeData.count,
+                price: tradeData.price
+            })
         );
 
-    await interaction.message.edit({
-        embeds: [updatedEmbed],
-        components: []
-    });
+        const updatedEmbed = EmbedBuilder.from(interaction.message.embeds[0])
+            .setColor(0x00FF00)
+            .setTitle(`${getEmoji('success')} Obchodní nabídka přijata`)
+            .addFields(
+                { name: 'Přijal', value: interaction.user.tag, inline: true },
+                { name: 'Stav peněz', value: `Prodávající: ${sellerFractionData.money} ${getEmoji('money')}\nKupující: ${buyerFractionData.money} ${getEmoji('money')}` }
+            );
 
-    await interaction.followUp({
-        content: `${getEmoji('success')} Obchodní nabídka byla úspěšně přijata a zpracována.`,
-        ephemeral: true
-    });
+        await interaction.message.edit({
+            embeds: [updatedEmbed],
+            components: []
+        });
+
+        await interaction.followUp({
+            content: `${getEmoji('success')} Obchodní nabídka byla úspěšně přijata a zpracována.`,
+            ephemeral: true
+        });
+    } catch (error) {
+        console.error('Error processing trade:', error);
+        await interaction.followUp({
+            content: `${getEmoji('error')} Nastala chyba při zpracování obchodní nabídky.`,
+            ephemeral: true
+        });
+    }
 }
 
-async function declineTrade(interaction, tradeData, tradePath) {
-    tradeData.status = 'declined';
-    tradeData.declinedBy = interaction.user.tag;
-    tradeData.declinedAt = new Date().toISOString();
-    fs.writeFileSync(tradePath, JSON.stringify(tradeData, null, 2));
-
-    const updatedEmbed = EmbedBuilder.from(interaction.message.embeds[0])
-        .setColor(0xFF0000)
-        .setTitle(`${getEmoji('error')} Obchodní nabídka odmítnuta`)
-        .addFields(
-            { name: 'Odmítl', value: interaction.user.tag, inline: true }
+async function declineTrade(interaction, tradeData, tradeId) {
+    try {
+        // Update trade status in database
+        await updateTradeStatus(tradeId, 'declined', {
+            user: interaction.user.tag,
+            timestamp: new Date().toISOString()
+        });
+        
+        // Add audit log
+        addAuditLog(
+            interaction.user.id,
+            'decline_trade',
+            'trade',
+            tradeId,
+            JSON.stringify({
+                seller: tradeData.seller,
+                buyer: tradeData.buyer,
+                itemId: tradeData.id,
+                itemName: tradeData.name
+            })
         );
 
-    await interaction.message.edit({
-        embeds: [updatedEmbed],
-        components: []
-    });
+        const updatedEmbed = EmbedBuilder.from(interaction.message.embeds[0])
+            .setColor(0xFF0000)
+            .setTitle(`${getEmoji('error')} Obchodní nabídka odmítnuta`)
+            .addFields(
+                { name: 'Odmítl', value: interaction.user.tag, inline: true }
+            );
 
-    await interaction.followUp({
-        content: `${getEmoji('error')} Obchodní nabídka byla odmítnuta.`,
-        ephemeral: true
-    });
+        await interaction.message.edit({
+            embeds: [updatedEmbed],
+            components: []
+        });
+
+        await interaction.followUp({
+            content: `${getEmoji('error')} Obchodní nabídka byla odmítnuta.`,
+            ephemeral: true
+        });
+    } catch (error) {
+        console.error('Error declining trade:', error);
+        await interaction.followUp({
+            content: `${getEmoji('error')} Nastala chyba při odmítání obchodní nabídky.`,
+            ephemeral: true
+        });
+    }
 }
 
 async function transferTradeItems(tradeData) {
-    const { buyer, seller, item, count } = tradeData;
-    const fractionPath = path.join(__dirname, '../../files/Fractions');
+    const { buyer, seller, id: itemId, count } = tradeData;
     
-    const sellerItemPath = path.join(fractionPath, seller, item.section, item.file);
-    const sellerSectionPath = path.join(fractionPath, seller, item.section);
-    const buyerSectionPath = path.join(fractionPath, buyer, item.section);
+    // Get item data from database
+    let itemData = null;
+    await new Promise((resolve) => {
+        db.get(
+            `SELECT purchases.*, shop_items.* 
+             FROM purchases 
+             JOIN shop_items ON purchases.item_id = shop_items.id 
+             WHERE purchases.id = ?`,
+            [itemId],
+            (err, row) => {
+                if (!err && row) {
+                    itemData = row;
+                }
+                resolve();
+            }
+        );
+    });
     
-    if (!fs.existsSync(buyerSectionPath)) {
-        fs.mkdirSync(buyerSectionPath, { recursive: true });
+    if (!itemData) {
+        throw new Error('Item not found in database');
     }
-
-    const sellerItem = JSON.parse(fs.readFileSync(sellerItemPath, 'utf8'));
-
-    if (item.type === 'countable') {
-        if (sellerItem.count === count) {
-            fs.unlinkSync(sellerItemPath);
-            
-            const remainingFiles = fs.readdirSync(sellerSectionPath)
-                .filter(file => file.endsWith('.json'));
-            if (remainingFiles.length === 0) {
-                fs.rmdirSync(sellerSectionPath);
-                console.log('Removed empty section directory:', sellerSectionPath);
+    
+    // Get buyer and seller fraction IDs
+    let buyerFractionId = null;
+    let sellerFractionId = null;
+    
+    await new Promise((resolve) => {
+        getFractionByName(buyer, (err, fraction) => {
+            if (!err && fraction) {
+                buyerFractionId = fraction.id;
             }
+            resolve();
+        });
+    });
+    
+    await new Promise((resolve) => {
+        getFractionByName(seller, (err, fraction) => {
+            if (!err && fraction) {
+                sellerFractionId = fraction.id;
+            }
+            resolve();
+        });
+    });
+    
+    if (!buyerFractionId || !sellerFractionId) {
+        throw new Error('Fraction not found in database');
+    }
+    
+    if (itemData.type === 'countable') {
+        if (itemData.count === count) {
+            // Delete the item completely from seller
+            await new Promise((resolve, reject) => {
+                db.run(
+                    `DELETE FROM purchases WHERE id = ?`,
+                    [itemId],
+                    (err) => {
+                        if (err) reject(err);
+                        else resolve();
+                    }
+                );
+            });
         } else {
-            sellerItem.count -= count;
-            fs.writeFileSync(sellerItemPath, JSON.stringify(sellerItem, null, 2));
+            // Update the count for seller
+            await new Promise((resolve, reject) => {
+                db.run(
+                    `UPDATE purchases SET count = count - ? WHERE id = ?`,
+                    [count, itemId],
+                    (err) => {
+                        if (err) reject(err);
+                        else resolve();
+                    }
+                );
+            });
         }
-
-        const buyerFiles = fs.readdirSync(buyerSectionPath)
-            .filter(f => f.endsWith('.json'));
         
+        // Check if buyer already has this item
         let existingItem = null;
-        let existingItemPath = null;
-
-        for (const file of buyerFiles) {
-            const currentItem = JSON.parse(fs.readFileSync(path.join(buyerSectionPath, file)));
-            if (currentItem.name === item.name) {
-                existingItem = currentItem;
-                existingItemPath = path.join(buyerSectionPath, file);
-                break;
-            }
-        }
-
-        if (existingItem) {
-            existingItem.count += count;
-            fs.writeFileSync(existingItemPath, JSON.stringify(existingItem, null, 2));
-        } else {
-            const newItem = {
-                ...sellerItem,
-                count: count,
-                id: Date.now().toString(36) + Math.random().toString(36).substr(2)
-            };
-            fs.writeFileSync(
-                path.join(buyerSectionPath, `${newItem.id}.json`),
-                JSON.stringify(newItem, null, 2)
+        await new Promise((resolve) => {
+            db.get(
+                `SELECT * FROM purchases 
+                 WHERE fraction_id = ? 
+                 AND item_id = ?`,
+                [buyerFractionId, itemData.item_id],
+                (err, row) => {
+                    if (!err && row) {
+                        existingItem = row;
+                    }
+                    resolve();
+                }
             );
+        });
+        
+        if (existingItem) {
+            // Update count for existing item
+            await new Promise((resolve, reject) => {
+                db.run(
+                    `UPDATE purchases SET count = count + ? WHERE id = ?`,
+                    [count, existingItem.id],
+                    (err) => {
+                        if (err) reject(err);
+                        else resolve();
+                    }
+                );
+            });
+        } else {
+            // Create new item for buyer
+            await new Promise((resolve, reject) => {
+                db.run(
+                    `INSERT INTO purchases 
+                     (fraction_id, item_id, count, selected_mods, total_price, purchase_date, buyer)
+                     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                    [
+                        buyerFractionId,
+                        itemData.item_id,
+                        count,
+                        itemData.selected_mods,
+                        0, // Cena je 0, protože je to přes obchod
+                        new Date().toISOString(),
+                        'trade' // Označení, že bylo získáno obchodem
+                    ],
+                    (err) => {
+                        if (err) reject(err);
+                        else resolve();
+                    }
+                );
+            });
         }
     } else {
-        fs.renameSync(sellerItemPath, path.join(buyerSectionPath, item.file));
-        
-        const remainingFiles = fs.readdirSync(sellerSectionPath)
-            .filter(file => file.endsWith('.json'));
-        if (remainingFiles.length === 0) {
-            fs.rmdirSync(sellerSectionPath);
-            console.log('Removed empty section directory:', sellerSectionPath);
-        }
+        // Pro necountable předměty - přesunout celý předmět
+        // Aktualizovat vlastníka předmětu
+        await new Promise((resolve, reject) => {
+            db.run(
+                `UPDATE purchases SET fraction_id = ?, buyer = ? WHERE id = ?`,
+                [buyerFractionId, 'trade', itemId],
+                (err) => {
+                    if (err) reject(err);
+                    else resolve();
+                }
+            );
+        });
     }
 }
 

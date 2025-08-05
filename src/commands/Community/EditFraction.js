@@ -10,6 +10,7 @@ const {
 const fs = require('fs');
 const path = require('path');
 const axios = require('axios');
+const { getFractionByName, updateFraction, addAuditLog } = require('../../Database/database');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -34,8 +35,13 @@ module.exports = {
 
             // Check if user is in a fraction
             const member = interaction.member;
-            const fractionRole = member.roles.cache.find(role => 
-                fs.existsSync(path.join(__dirname, '../../files/Fractions', role.name)));
+            const fractionRole = member.roles.cache.find(role => {
+                return new Promise((resolve) => {
+                    getFractionByName(role.name, (err, fraction) => {
+                        resolve(fraction !== undefined);
+                    });
+                });
+            });
             
             if (!fractionRole) {
                 return await interaction.editReply({
@@ -43,9 +49,30 @@ module.exports = {
                     components: []
                 });
             }
-
-            const fractionPath = path.join(__dirname, '../../files/Fractions', fractionRole.name);
-            const fractionData = JSON.parse(fs.readFileSync(path.join(fractionPath, `${fractionRole.name}.json`)));
+            
+            // Get fraction data from database
+            const fractionName = fractionRole.name;
+            let fractionData;
+            
+            await new Promise((resolve) => {
+                getFractionByName(fractionName, (err, fraction) => {
+                    fractionData = fraction;
+                    resolve();
+                });
+            });
+            
+            if (!fractionData) {
+                return await interaction.editReply({
+                    content: '❌ Nastala chyba při načítání dat frakce.',
+                    components: []
+                });
+            }
+            
+            // Create directory for fraction files if it doesn't exist
+            const fractionFilesDir = path.join(__dirname, '../../Database/Files/Fractions', fractionName);
+            if (!fs.existsSync(fractionFilesDir)) {
+                fs.mkdirSync(fractionFilesDir, { recursive: true });
+            }
 
             // Handle changes
             const newPopis = interaction.options.getString('popis');
@@ -54,7 +81,7 @@ module.exports = {
             let changes = [];
 
             if (newPopis) {
-                fractionData.popis = newPopis;
+                fractionData.description = newPopis;
                 changes.push('✏️ Popis');
             }
 
@@ -79,6 +106,7 @@ module.exports = {
                     }
                 }
 
+                fractionData.color = newBarva;
                 changes.push('🎨 Barva');
             }
 
@@ -93,10 +121,10 @@ module.exports = {
                 // Download and save image
                 const response = await axios.get(newImage.url, { responseType: 'arraybuffer' });
                 const imageExt = newImage.contentType.split('/')[1];
-                const imagePath = path.join(fractionPath, `logo.${imageExt}`);
+                const imagePath = path.join(fractionFilesDir, `logo.${imageExt}`);
 
                 fs.writeFileSync(imagePath, response.data);
-                fractionData.imageUrl = `logo.${imageExt}`;
+                fractionData.logoPath = `logo.${imageExt}`;
                 changes.push('🖼️ Obrázek');
             }
 
@@ -106,14 +134,36 @@ module.exports = {
                 });
             }
 
-            // Save changes
-            fs.writeFileSync(
-                path.join(fractionPath, `${fractionRole.name}.json`),
-                JSON.stringify(fractionData, null, 2)
+            // Save changes to database
+            await new Promise((resolve) => {
+                updateFraction(
+                    fractionData.id,
+                    fractionData.name,
+                    fractionData.description,
+                    fractionData.money,
+                    fractionData.color,
+                    fractionData.logoPath,
+                    fractionData.warns,
+                    fractionData.roomId,
+                    fractionData.leaderRoleId,
+                    fractionData.deputyRoleId,
+                    fractionData.fractionRoleId,
+                    fractionData.creationDate
+                );
+                resolve();
+            });
+            
+            // Log the action
+            addAuditLog(
+                interaction.user.id,
+                'edit_fraction',
+                'fraction',
+                fractionData.id.toString(),
+                JSON.stringify(changes)
             );
 
             const resultEmbed = new EmbedBuilder()
-                .setColor(`#${newBarva || fractionData.barva}`)
+                .setColor(`#${newBarva || fractionData.color}`)
                 .setTitle('✅ Frakce upravena')
                 .setDescription(`Byly provedeny následující změny:\n${changes.join('\n')}`)
                 .addFields({ 

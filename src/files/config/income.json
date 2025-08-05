@@ -1,5 +1,6 @@
 {
-  "paymentTime": "0 0 * * *",
-  "defaultCurrency": "money",
-  "historyRetention": 30
+  "hourlyDistribution": false,
+  "dailyDistribution": true,
+  "distributionHour": 18,
+  "distributionMinute": 0
 }

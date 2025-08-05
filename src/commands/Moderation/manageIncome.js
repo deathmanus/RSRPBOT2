@@ -1,6 +1,7 @@
 const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
 const fs = require('fs');
 const path = require('path');
+const { addIncomeRole, removeIncomeRole, addAuditLog } = require('../../Database/database');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -29,33 +30,55 @@ module.exports = {
                         .setRequired(true))),
 
     async execute(interaction) {
-        const incomeFile = path.join(__dirname, '../../files/Income/income-config.json');
-        const config = JSON.parse(fs.readFileSync(incomeFile, 'utf8'));
+        try {
+            if (interaction.options.getSubcommand() === 'add') {
+                const role = interaction.options.getRole('role');
+                const amount = interaction.options.getInteger('amount');
 
-        if (interaction.options.getSubcommand() === 'add') {
-            const role = interaction.options.getRole('role');
-            const amount = interaction.options.getInteger('amount');
-
-            config.roles.push({
-                roleId: role.id,
-                dailyIncome: amount,
-                description: role.name
-            });
-
-            fs.writeFileSync(incomeFile, JSON.stringify(config, null, 2));
-            await interaction.reply(`✅ Role ${role.name} byla přidána s denním income ${amount}`);
-        }
-        else if (interaction.options.getSubcommand() === 'remove') {
-            const role = interaction.options.getRole('role');
-            const index = config.roles.findIndex(r => r.roleId === role.id);
-
-            if (index === -1) {
-                return interaction.reply('❌ Tato role nemá nastavený income');
+                // Přidání role do databáze
+                await addIncomeRole(role.id, role.name, amount, interaction.user.id);
+                
+                // Zápis do audit logu
+                addAuditLog(
+                    interaction.user.id,
+                    'add_income_role',
+                    'role',
+                    role.id,
+                    JSON.stringify({ 
+                        roleName: role.name, 
+                        dailyIncome: amount 
+                    })
+                );
+                
+                await interaction.reply(`✅ Role ${role.name} byla přidána s denním income ${amount}`);
             }
-
-            config.roles.splice(index, 1);
-            fs.writeFileSync(incomeFile, JSON.stringify(config, null, 2));
-            await interaction.reply(`✅ Role ${role.name} byla odebrána z income systému`);
+            else if (interaction.options.getSubcommand() === 'remove') {
+                const role = interaction.options.getRole('role');
+                
+                // Odebrání role z databáze
+                removeIncomeRole(role.id, async (err, success) => {
+                    if (err || !success) {
+                        return interaction.reply('❌ Tato role nemá nastavený income');
+                    }
+                    
+                    // Zápis do audit logu
+                    addAuditLog(
+                        interaction.user.id,
+                        'remove_income_role',
+                        'role',
+                        role.id,
+                        JSON.stringify({ roleName: role.name })
+                    );
+                    
+                    await interaction.reply(`✅ Role ${role.name} byla odebrána z income systému`);
+                });
+            }
+        } catch (error) {
+            console.error('Error in income command:', error);
+            await interaction.reply({
+                content: '❌ Nastala chyba při zpracování příkazu.',
+                ephemeral: true
+            });
         }
     }
 };

@@ -1,3 +1,9 @@
 {
-  "roles": []
+  "roles": [
+    {
+      "roleId": "1234567890123456789",
+      "dailyIncome": 1000,
+      "description": "Example Income Role"
+    }
+  ]
 }

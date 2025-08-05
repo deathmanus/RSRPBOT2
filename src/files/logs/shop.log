@@ -1,27 +1,31 @@
-{"timestamp":"2025-02-24T10:15:06.122Z","action":"Command Started","data":{"user":"death_man","userId":"705815238716686337","channel":"》cmd-logs📖","guildId":"1213225813844037734"}}
-{"timestamp":"2025-02-24T10:15:06.346Z","action":"Loaded Shop Sections","data":{"sections":["Air vehicles","Equipment","Ground vehicles"]}}
-{"timestamp":"2025-02-24T10:15:06.808Z","action":"Initial Shop Menu Created","data":{"type":"section_select","available_sections":["Air vehicles","Equipment","Ground vehicles"]}}
-{"timestamp":"2025-02-24T10:15:08.543Z","action":"Section Selected","data":{"selectedSection":"Air vehicles"}}
-{"timestamp":"2025-02-24T10:15:08.545Z","action":"Section Loaded","data":{"section":"Air vehicles","itemCount":5}}
-{"timestamp":"2025-02-24T10:15:24.660Z","action":"Command Started","data":{"user":"death_man","userId":"705815238716686337","channel":"》cmd-logs📖","guildId":"1213225813844037734"}}
-{"timestamp":"2025-02-24T10:15:24.877Z","action":"Loaded Shop Sections","data":{"sections":["Air vehicles","Equipment","Ground vehicles"]}}
-{"timestamp":"2025-02-24T10:15:25.243Z","action":"Initial Shop Menu Created","data":{"type":"section_select","available_sections":["Air vehicles","Equipment","Ground vehicles"]}}
-{"timestamp":"2025-02-24T10:15:30.490Z","action":"Section Selected","data":{"selectedSection":"Air vehicles"}}
-{"timestamp":"2025-02-24T10:15:30.491Z","action":"Cache Hit","data":{"section":"Air vehicles"}}
-{"timestamp":"2025-02-24T18:44:55.965Z","action":"Command Started","data":{"user":"death_man","userId":"705815238716686337","channel":"》cmd-logs📖","guildId":"1213225813844037734"}}
-{"timestamp":"2025-02-24T18:44:56.203Z","action":"Loaded Shop Sections","data":{"sections":["Air vehicles","Equipment","Ground vehicles"]}}
-{"timestamp":"2025-02-24T18:44:56.503Z","action":"Initial Shop Menu Created","data":{"type":"section_select","available_sections":["Air vehicles","Equipment","Ground vehicles"]}}
-{"timestamp":"2025-02-24T18:44:59.523Z","action":"Section Selected","data":{"selectedSection":"Air vehicles"}}
-{"timestamp":"2025-02-24T18:44:59.525Z","action":"Section Loaded","data":{"section":"Air vehicles","itemCount":5}}
-{"timestamp":"2025-02-24T18:45:20.876Z","action":"Purchase Completed","data":{"itemId":"m7jer1oim58fqk24u5d","buyer":"death_man","fraction":"z","totalPrice":11800}}
-{"timestamp":"2025-02-24T21:14:20.970Z","action":"Command Started","data":{"user":"death_man","userId":"705815238716686337","channel":"》cmd-logs📖","guildId":"1213225813844037734"}}
-{"timestamp":"2025-02-24T21:14:21.241Z","action":"Loaded Shop Sections","data":{"sections":["Air vehicles","Equipment","Ground vehicles"]}}
-{"timestamp":"2025-02-24T21:14:21.441Z","action":"Initial Shop Menu Created","data":{"type":"section_select","available_sections":["Air vehicles","Equipment","Ground vehicles"]}}
-{"timestamp":"2025-02-24T21:14:23.363Z","action":"Section Selected","data":{"selectedSection":"Air vehicles"}}
-{"timestamp":"2025-02-24T21:14:23.365Z","action":"Section Loaded","data":{"section":"Air vehicles","itemCount":5}}
-{"timestamp":"2025-02-24T21:14:28.777Z","action":"Section Selected","data":{"selectedSection":"Equipment"}}
-{"timestamp":"2025-02-24T21:14:28.780Z","action":"Section Loaded","data":{"section":"Equipment","itemCount":7}}
-{"timestamp":"2025-02-24T21:14:30.134Z","action":"Section Selected","data":{"selectedSection":"Air vehicles"}}
-{"timestamp":"2025-02-24T21:14:30.134Z","action":"Cache Hit","data":{"section":"Air vehicles"}}
-{"timestamp":"2025-02-24T21:15:56.648Z","action":"Purchase Completed","data":{"itemId":"m7jk4prgs7qaq44tdo","buyer":"death_man","fraction":"z","totalPrice":15100}}
-{"timestamp":"2025-02-24T21:19:21.451Z","action":"Collector Ended","data":{"reason":"time","interactionsCollected":12}}
+[]
+{"timestamp":"2025-08-05T20:02:28.561Z","action":"Command Started","data":{"user":"death_man","userId":"705815238716686337","channel":"》cmd-logs📖","guildId":"1213225813844037734"}}
+{"timestamp":"2025-08-05T20:02:28.866Z","action":"Loaded Shop Sections (DB)","data":{"sections":["Air vehicles","Equipment","Ground vehicles"]}}
+{"timestamp":"2025-08-05T20:02:29.148Z","action":"Initial Shop Menu Created","data":{"type":"section_select","available_sections":["Air vehicles","Equipment","Ground vehicles"]}}
+{"timestamp":"2025-08-05T20:02:33.036Z","action":"Section Selected","data":{"selectedSection":"Air vehicles"}}
+{"timestamp":"2025-08-05T20:02:33.038Z","action":"Section Loaded (DB)","data":{"section":"Air vehicles","itemCount":6}}
+{"timestamp":"2025-08-05T20:02:54.858Z","action":"Section Selected","data":{"selectedSection":"Ground vehicles"}}
+{"timestamp":"2025-08-05T20:02:54.860Z","action":"Section Loaded (DB)","data":{"section":"Ground vehicles","itemCount":7}}
+{"timestamp":"2025-08-05T20:03:20.034Z","action":"Section Selected","data":{"selectedSection":"Air vehicles"}}
+{"timestamp":"2025-08-05T20:03:20.034Z","action":"Cache Hit","data":{"section":"Air vehicles"}}
+{"timestamp":"2025-08-05T20:03:39.546Z","action":"Sub-Modification Attempt","data":{"modIndex":1,"subModName":"GunRight","subMod":"GunRight","optName":"M3M","optPrice":"4","currentMods":[{"modName":"Camo","selected":"Camo:NATO green:0","subSelections":{}},{"modName":"Config","selected":"Config:Armed:0","subSelections":{"GunRight":{"name":"No weapon","price":0},"GunLeft":{"name":"No weapon","price":0}}}]}}
+{"timestamp":"2025-08-05T20:03:39.548Z","action":"Sub-Modification Selected","data":{"modIndex":1,"mainMod":"Config","subModName":"GunRight","optName":"M3M","price":4,"updatedMod":{"modName":"Config","selected":"Config:Armed:0","subSelections":{"GunRight":{"name":"M3M","price":4},"GunLeft":{"name":"No weapon","price":0}}}}}
+{"timestamp":"2025-08-05T20:03:41.350Z","action":"Sub-Modification Attempt","data":{"modIndex":1,"subModName":"GunLeft","subMod":"GunLeft","optName":"M3M","optPrice":"4","currentMods":[{"modName":"Camo","selected":"Camo:NATO green:0","subSelections":{}},{"modName":"Config","selected":"Config:Armed:0","subSelections":{"GunRight":{"name":"M3M","price":4},"GunLeft":{"name":"No weapon","price":0}}}]}}
+{"timestamp":"2025-08-05T20:03:41.352Z","action":"Sub-Modification Selected","data":{"modIndex":1,"mainMod":"Config","subModName":"GunLeft","optName":"M3M","price":4,"updatedMod":{"modName":"Config","selected":"Config:Armed:0","subSelections":{"GunRight":{"name":"M3M","price":4},"GunLeft":{"name":"M3M","price":4}}}}}
+{"timestamp":"2025-08-05T20:03:51.362Z","action":"Section Selected","data":{"selectedSection":"Equipment"}}
+{"timestamp":"2025-08-05T20:03:51.364Z","action":"Section Loaded (DB)","data":{"section":"Equipment","itemCount":6}}
+{"timestamp":"2025-08-05T20:03:53.932Z","action":"Section Selected","data":{"selectedSection":"Ground vehicles"}}
+{"timestamp":"2025-08-05T20:03:53.933Z","action":"Cache Hit","data":{"section":"Ground vehicles"}}
+{"timestamp":"2025-08-05T20:04:20.415Z","action":"Sub-Modification Attempt","data":{"modIndex":1,"subModName":"Back","subMod":"Back","optName":"M240B","optPrice":"2","currentMods":[{"modName":"Camo","selected":"Camo:FS 34094 (Green):0","subSelections":{}},{"modName":"Config","selected":"Config:Heavy:1","subSelections":{"Back":{"name":"No weapon","price":0}}}]}}
+{"timestamp":"2025-08-05T20:04:20.418Z","action":"Sub-Modification Selected","data":{"modIndex":1,"mainMod":"Config","subModName":"Back","optName":"M240B","price":2,"updatedMod":{"modName":"Config","selected":"Config:Heavy:1","subSelections":{"Back":{"name":"M240B","price":2}}}}}
+{"timestamp":"2025-08-05T20:04:39.856Z","action":"Sub-Modification Attempt","data":{"modIndex":1,"subModName":"Roof","subMod":"Roof","optName":"6P49 + gunner protection","optPrice":"3","currentMods":[{"modName":"Camo","selected":"Camo:Protective green:0","subSelections":{}},{"modName":"Config","selected":"Config:STS stock:0","subSelections":{"Roof":{"name":"None","price":0}}},{"modName":"Extra","selected":"Extra:N/A:0","subSelections":{}}]}}
+{"timestamp":"2025-08-05T20:04:39.857Z","action":"Sub-Modification Selected","data":{"modIndex":1,"mainMod":"Config","subModName":"Roof","optName":"6P49 + gunner protection","price":3,"updatedMod":{"modName":"Config","selected":"Config:STS stock:0","subSelections":{"Roof":{"name":"6P49 + gunner protection","price":3}}}}}
+{"timestamp":"2025-08-05T20:05:11.055Z","action":"Sub-Modification Attempt","data":{"modIndex":1,"subModName":"Roof","subMod":"Roof","optName":"6P49","optPrice":"2","currentMods":[{"modName":"Camo","selected":"Camo:Protective green:0","subSelections":{}},{"modName":"Config","selected":"Config:AMN upgrade:2","subSelections":{"Roof":{"name":"None","price":0}}},{"modName":"Extra","selected":"Extra:Communications kit:1","subSelections":{}}]}}
+{"timestamp":"2025-08-05T20:05:11.057Z","action":"Sub-Modification Selected","data":{"modIndex":1,"mainMod":"Config","subModName":"Roof","optName":"6P49","price":2,"updatedMod":{"modName":"Config","selected":"Config:AMN upgrade:2","subSelections":{"Roof":{"name":"6P49","price":2}}}}}
+{"timestamp":"2025-08-05T20:07:29.157Z","action":"Collector Ended","data":{"reason":"time","interactionsCollected":46}}
+{"timestamp":"2025-08-05T20:37:57.282Z","action":"Command Started","data":{"user":"death_man","userId":"705815238716686337","channel":"》cmd-logs📖","guildId":"1213225813844037734"}}
+{"timestamp":"2025-08-05T20:37:57.559Z","action":"Loaded Shop Sections (DB)","data":{"sections":["Air vehicles","Equipment","Ground vehicles"]}}
+{"timestamp":"2025-08-05T20:37:57.827Z","action":"Initial Shop Menu Created","data":{"type":"section_select","available_sections":["Air vehicles","Equipment","Ground vehicles"]}}
+{"timestamp":"2025-08-05T20:38:02.536Z","action":"Section Selected","data":{"selectedSection":"Air vehicles"}}
+{"timestamp":"2025-08-05T20:38:02.538Z","action":"Section Loaded (DB)","data":{"section":"Air vehicles","itemCount":6}}
+{"timestamp":"2025-08-05T20:38:10.837Z","action":"Purchase Error","data":{"error":"Fraction not found","stack":"Error: Fraction not found\n    at C:\\Users\\fredy\\Desktop\\RSBOT NEW\\RSRPBOT2\\src\\commands\\Community\\Shop.js:531:48\n    at Statement.<anonymous> (C:\\Users\\fredy\\Desktop\\RSBOT NEW\\RSRPBOT2\\src\\Database\\database.js:210:9)\n    at Statement.replacement (C:\\Users\\fredy\\Desktop\\RSBOT NEW\\RSRPBOT2\\node_modules\\sqlite3\\lib\\trace.js:25:27)\n    at Statement.replacement (C:\\Users\\fredy\\Desktop\\RSBOT NEW\\RSRPBOT2\\node_modules\\sqlite3\\lib\\trace.js:25:27)"}}

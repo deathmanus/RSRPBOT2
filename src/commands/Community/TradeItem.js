@@ -2,6 +2,7 @@ const { SlashCommandBuilder, ActionRowBuilder, StringSelectMenuBuilder, ButtonBu
 const { getEmoji } = require('../../utils/emojiUtils');
 const fs = require('fs');
 const path = require('path');
+const { db, getFractionByName, getFractionItems, updateFractionMoney, addAuditLog } = require('../../Database/database');
 
 // Modify the createItemMenus function
 function createItemMenus(items, currentPage = 0) {
@@ -59,10 +60,17 @@ module.exports = {
 
             // Get seller's fraction
             const member = interaction.member;
-            const fractionPath = path.join(__dirname, '../../files/Fractions');
-            const fractions = fs.readdirSync(fractionPath, { withFileTypes: true })
-                .filter(dirent => dirent.isDirectory())
-                .map(dirent => dirent.name);
+            
+            // Get all fractions from database
+            const fractions = [];
+            await new Promise((resolve) => {
+                db.all(`SELECT name FROM fractions`, [], (err, rows) => {
+                    if (!err && rows) {
+                        rows.forEach(row => fractions.push(row.name));
+                    }
+                    resolve();
+                });
+            });
 
             const sellerFraction = member.roles.cache.find(role => fractions.includes(role.name))?.name;
 
@@ -119,42 +127,48 @@ module.exports = {
                             await i.deferUpdate();
                             selectedBuyer = i.values[0];
                             
-                            const sellerItemsPath = path.join(fractionPath, sellerFraction);
-                            const sections = fs.readdirSync(sellerItemsPath, { withFileTypes: true })
-                                .filter(dirent => dirent.isDirectory())
-                                .map(dirent => dirent.name);
-                        
+                            // Get seller's items from database
+                            let fractionItems = [];
+                            await new Promise((resolve) => {
+                                getFractionItems(sellerFraction, (err, items) => {
+                                    if (!err && items) {
+                                        fractionItems = items;
+                                    }
+                                    resolve();
+                                });
+                            });
+                            
                             const itemOptions = [];
-                            let hasItems = false;
-                        
-                            // Get first 25 items only
-                            for (const section of sections) {
-                                if (itemOptions.length >= 23) break; // Leave room for navigation
+                            let hasItems = fractionItems.length > 0;
+                            
+                            // Organize items by section
+                            const sectionMap = {};
+                            fractionItems.forEach(item => {
+                                let section = 'Other';
+                                if (item.type === 'air_vehicle') section = 'Air vehicles';
+                                else if (item.type === 'ground_vehicle') section = 'Ground vehicles';
+                                else if (item.type === 'equipment') section = 'Equipment';
+                                else if (item.type === 'resource') section = 'Resources';
                                 
-                                const sectionPath = path.join(sellerItemsPath, section);
-                                const items = fs.readdirSync(sectionPath)
-                                    .filter(file => file.endsWith('.json'))
-                                    .map(file => {
-                                        try {
-                                            const itemData = JSON.parse(fs.readFileSync(path.join(sectionPath, file)));
-                                            const shopSectionPath = path.join(__dirname, '../../files/Shop', section);
-                                            
-                                            if (!fs.existsSync(shopSectionPath)) return null;
-                                            
-                                            const shopFiles = fs.readdirSync(shopSectionPath)
-                                                .filter(f => f.endsWith('.json'));
-                                            
-                                            // ... rest of item loading logic
-                                        } catch (error) {
-                                            console.error(`Error loading item ${file}:`, error);
-                                            return null;
-                                        }
-                                    })
-                                    .filter(item => item !== null);
-                                    
-                                itemOptions.push(...items);
-                            }
-                        
+                                if (!sectionMap[section]) {
+                                    sectionMap[section] = [];
+                                }
+                                
+                                sectionMap[section].push({
+                                    label: `${item.name} (ID: ${item.id})`,
+                                    value: `${section}:${item.id}:${item.name}`,
+                                    description: `Typ: ${item.type}`
+                                });
+                            });
+                            
+                            // Add items to options (up to 25 items)
+                            Object.entries(sectionMap).forEach(([section, items]) => {
+                                if (itemOptions.length < 23) { // Leave room for navigation
+                                    const sectionItems = items.slice(0, 23 - itemOptions.length);
+                                    itemOptions.push(...sectionItems);
+                                }
+                            });
+                            
                             if (!hasItems) {
                                 return await i.editReply({
                                     content: `${getEmoji('error')} Vaše frakce nemá žádné předměty k prodeji.`,
@@ -162,7 +176,7 @@ module.exports = {
                                     components: []
                                 });
                             }
-                        
+                            
                             const { options, currentPage, totalPages } = createItemMenus(itemOptions);
                             
                             if (options.length === 0) {
@@ -172,8 +186,36 @@ module.exports = {
                                     components: []
                                 });
                             }
-                        
-                            // ... rest of the code
+                            
+                            const itemMenu = new StringSelectMenuBuilder()
+                                .setCustomId('select-item')
+                                .setPlaceholder('Vyberte předmět k prodeji')
+                                .addOptions(options);
+                            
+                            embed.setDescription(
+                                `Prodávající frakce: ${sellerFraction}\n` +
+                                `Kupující frakce: ${selectedBuyer}\n` +
+                                `Cena: ${price} ${getEmoji('money')}`
+                            );
+                            
+                            if (totalPages > 1) {
+                                embed.setFooter({ text: `Stránka ${currentPage + 1}/${totalPages}` });
+                            }
+                            
+                            await i.editReply({
+                                embeds: [embed],
+                                components: [
+                                    new ActionRowBuilder().addComponents(
+                                        new StringSelectMenuBuilder(buyerMenu.data)
+                                            .setOptions(buyerOptions)
+                                            .spliceOptions(0, buyerOptions.length, ...buyerOptions.map(opt => ({
+                                                ...opt,
+                                                default: opt.value === selectedBuyer
+                                            })))
+                                    ),
+                                    new ActionRowBuilder().addComponents(itemMenu)
+                                ]
+                            });
                         } catch (error) {
                             console.error('Error in select-buyer handler:', error);
                             await i.editReply({
@@ -217,20 +259,43 @@ module.exports = {
                             });
                         } else {
                             await i.deferUpdate();
-                            const [section, file, shopFile] = i.values[0].split(':');
-                            const itemPath = path.join(fractionPath, sellerFraction, section, file);
-                            const itemData = JSON.parse(fs.readFileSync(itemPath, 'utf8'));
-                            const originalItemPath = path.join(__dirname, '../../files/Shop', section, shopFile);
-                            const originalItemData = JSON.parse(fs.readFileSync(originalItemPath, 'utf8'));
+                            const [section, itemId, itemName] = i.values[0].split(':');
+                            
+                            // Get item data from database
+                            let itemData = null;
+                            await new Promise((resolve) => {
+                                db.get(
+                                    `SELECT purchases.*, shop_items.* 
+                                     FROM purchases 
+                                     JOIN shop_items ON purchases.item_id = shop_items.id 
+                                     WHERE purchases.id = ?`,
+                                    [itemId],
+                                    (err, row) => {
+                                        if (!err && row) {
+                                            itemData = row;
+                                        }
+                                        resolve();
+                                    }
+                                );
+                            });
+                            
+                            if (!itemData) {
+                                return await i.editReply({
+                                    content: `${getEmoji('error')} Předmět nebyl nalezen v databázi.`,
+                                    components: []
+                                });
+                            }
                             
                             selectedItem = { 
-                                ...itemData,
-                                type: originalItemData.type,
-                                section,
-                                file 
+                                id: itemData.id,
+                                name: itemData.name,
+                                type: itemData.type,
+                                count: itemData.count || 1,
+                                selectedMods: itemData.selected_mods ? JSON.parse(itemData.selected_mods) : [],
+                                price: itemData.base_price
                             };
                         
-                            if (originalItemData.type === 'countable') {
+                            if (itemData.type === 'countable') {
                                 const countMenu = new StringSelectMenuBuilder()
                                     .setCustomId('select-count')
                                     .setPlaceholder('Vyberte množství')
@@ -275,8 +340,8 @@ module.exports = {
                                     `Cena: ${price} ${getEmoji('money')}`
                                 );
                         
-                                if (itemData.selectedMods) {
-                                    const modFields = itemData.selectedMods
+                                if (selectedItem.selectedMods && selectedItem.selectedMods.length > 0) {
+                                    const modFields = selectedItem.selectedMods
                                         .filter(mod => mod && mod.modName)
                                         .map(mod => ({
                                             name: mod.modName,
@@ -346,79 +411,97 @@ module.exports = {
                             createdAt: new Date().toISOString(),
                             createdBy: interaction.user.tag
                         };
-                    
-                        const tradesPath = path.join(__dirname, '../../files/Trades');
-                        if (!fs.existsSync(tradesPath)) {
-                            fs.mkdirSync(tradesPath, { recursive: true });
-                        }
-                    
-                        fs.writeFileSync(
-                            path.join(tradesPath, `${tradeId}.json`),
-                            JSON.stringify(tradeData, null, 2)
-                        );
-                    
-                        const tradeEmbed = new EmbedBuilder()
-                            .setTitle(`${getEmoji('trade')} Nová obchodní nabídka`)
-                            .setDescription(
-                                `Frakce **${sellerFraction}** nabízí frakci **${selectedBuyer}** následující předmět:`
-                            )
-                            .setColor(0x00FF00)
-                            .addFields(
-                                { name: 'Předmět', value: selectedItem.name, inline: true },
-                                { name: 'Cena', value: `${price} ${getEmoji('money')}`, inline: true }
+                        
+                        try {
+                            // Uložit obchodní nabídku do databáze
+                            await createTrade(tradeData);
+                            
+                            // Přidat audit log
+                            addAuditLog(
+                                interaction.user.id,
+                                'create_trade',
+                                'trade',
+                                tradeId,
+                                JSON.stringify({
+                                    seller: sellerFraction,
+                                    buyer: selectedBuyer,
+                                    itemId: selectedItem.id,
+                                    itemName: selectedItem.name,
+                                    count: selectedCount,
+                                    price: price
+                                })
                             );
+                        
+                            const tradeEmbed = new EmbedBuilder()
+                                .setTitle(`${getEmoji('trade')} Nová obchodní nabídka`)
+                                .setDescription(
+                                    `Frakce **${sellerFraction}** nabízí frakci **${selectedBuyer}** následující předmět:`
+                                )
+                                .setColor(0x00FF00)
+                                .addFields(
+                                    { name: 'Předmět', value: selectedItem.name, inline: true },
+                                    { name: 'Cena', value: `${price} ${getEmoji('money')}`, inline: true }
+                                );
 
-                        // Přidat pole podle typu předmětu
-                        if (selectedItem.type === 'countable') {
-                            tradeEmbed.addFields({
-                                name: 'Množství',
-                                value: `${selectedCount}x`,
-                                inline: true
-                            });
-                        } else if (selectedItem.selectedMods) {
-                            // Přidat modifikace pokud existují
-                            const modFields = selectedItem.selectedMods
-                                .filter(mod => mod && mod.modName)
-                                .map(mod => ({
-                                    name: mod.modName,
-                                    value: `${mod.selected.split(':')[1]}${
-                                        mod.subSelections && Object.keys(mod.subSelections).length > 0 ?
-                                            '\n' + Object.entries(mod.subSelections)
-                                                .map(([name, opt]) => `${name}: ${opt.name}`).join('\n') 
-                                            : ''
-                                    }`
-                                }));
+                            // Přidat pole podle typu předmětu
+                            if (selectedItem.type === 'countable') {
+                                tradeEmbed.addFields({
+                                    name: 'Množství',
+                                    value: `${selectedCount}x`,
+                                    inline: true
+                                });
+                            } else if (selectedItem.selectedMods && selectedItem.selectedMods.length > 0) {
+                                // Přidat modifikace pokud existují
+                                const modFields = selectedItem.selectedMods
+                                    .filter(mod => mod && mod.modName)
+                                    .map(mod => ({
+                                        name: mod.modName,
+                                        value: `${mod.selected.split(':')[1]}${
+                                            mod.subSelections && Object.keys(mod.subSelections).length > 0 ?
+                                                '\n' + Object.entries(mod.subSelections)
+                                                    .map(([name, opt]) => `${name}: ${opt.name}`).join('\n') 
+                                                : ''
+                                        }`
+                                    }));
 
-                            if (modFields.length > 0) {
-                                tradeEmbed.addFields(modFields);
+                                if (modFields.length > 0) {
+                                    tradeEmbed.addFields(modFields);
+                                }
                             }
-                        }
 
-                        tradeEmbed.setFooter({ text: `Trade ID: ${tradeId}` });
-                    
-                        const acceptButton = new ButtonBuilder()
-                            .setCustomId(`accept-trade:${tradeId}`)
-                            .setLabel('Přijmout')
-                            .setStyle(ButtonStyle.Success);
-                    
-                        const declineButton = new ButtonBuilder()
-                            .setCustomId(`decline-trade:${tradeId}`)
-                            .setLabel('Odmítnout')
-                            .setStyle(ButtonStyle.Danger);
-                    
-                        const tradeMessage = await interaction.channel.send({
-                            content: `<@&${interaction.guild.roles.cache.find(r => r.name === selectedBuyer).id}>`,
-                            embeds: [tradeEmbed],
-                            components: [new ActionRowBuilder().addComponents(acceptButton, declineButton)]
-                        });
-                    
-                        await i.editReply({
-                            content: `${getEmoji('success')} Obchodní nabídka byla úspěšně odeslána.`,
-                            embeds: [],
-                            components: []
-                        });
-                    
-                        collector.stop();
+                            tradeEmbed.setFooter({ text: `Trade ID: ${tradeId}` });
+                        
+                            const acceptButton = new ButtonBuilder()
+                                .setCustomId(`accept-trade:${tradeId}`)
+                                .setLabel('Přijmout')
+                                .setStyle(ButtonStyle.Success);
+                        
+                            const declineButton = new ButtonBuilder()
+                                .setCustomId(`decline-trade:${tradeId}`)
+                                .setLabel('Odmítnout')
+                                .setStyle(ButtonStyle.Danger);
+                        
+                            const tradeMessage = await interaction.channel.send({
+                                content: `<@&${interaction.guild.roles.cache.find(r => r.name === selectedBuyer).id}>`,
+                                embeds: [tradeEmbed],
+                                components: [new ActionRowBuilder().addComponents(acceptButton, declineButton)]
+                            });
+                        
+                            await i.editReply({
+                                content: `${getEmoji('success')} Obchodní nabídka byla úspěšně odeslána.`,
+                                embeds: [],
+                                components: []
+                            });
+                        
+                            collector.stop();
+                        } catch (error) {
+                            console.error('Error creating trade:', error);
+                            await i.editReply({
+                                content: `${getEmoji('error')} Nastala chyba při vytváření obchodní nabídky.`,
+                                embeds: [],
+                                components: []
+                            });
+                        }
                     }
                     else if (i.customId === 'cancel-trade') {
                         await i.deferUpdate();
