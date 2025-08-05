@@ -1,8 +1,14 @@
 const { SlashCommandBuilder, ActionRowBuilder, StringSelectMenuBuilder, EmbedBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const { ShopSystem, ShopLogger } = require('../../systems/shopSystem');
 const { getEmoji } = require('../../utils/emojiUtils');
-const fs = require('fs');
-const path = require('path');
+const { 
+    getFractionByName, 
+    getShopItems, 
+    getFractionItems, 
+    updateFractionMoney, 
+    addFractionItem,
+    db
+} = require('../../Database/database');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -17,14 +23,20 @@ module.exports = {
                 guildId: interaction.guildId
             });
 
-            await interaction.deferReply({ flags: 64 });
+            await interaction.deferReply({ ephemeral: true });
 
-            const shopDir = path.join(__dirname, '../../files/Shop');
-            const sections = fs.readdirSync(shopDir, { withFileTypes: true })
-                .filter(dirent => dirent.isDirectory())
-                .map(dirent => dirent.name);
+            // Get sections from database
+            const sections = await new Promise((resolve, reject) => {
+                db.all(`SELECT name FROM shop_sections ORDER BY name ASC`, [], (err, rows) => {
+                    if (err) {
+                        reject(err);
+                        return;
+                    }
+                    resolve(rows.map(row => row.name));
+                });
+            });
 
-            ShopLogger.log('Loaded Shop Sections', { sections });
+            ShopLogger.log('Loaded Shop Sections (DB)', { sections });
 
             if (sections.length === 0) {
                 ShopLogger.log('Error', 'No shop sections available');
@@ -35,6 +47,7 @@ module.exports = {
             let selectedItem = null;
             let selectedMods = [];
             let itemState = null;
+            let currentPage = 0;
 
             const createSectionMenu = (selected = null) => {
                 return new StringSelectMenuBuilder()
@@ -70,7 +83,9 @@ module.exports = {
 
             collector.on('collect', async i => {
                 try {
-                    await i.deferUpdate();
+                    await i.deferUpdate().catch(error => {
+                        console.error('Error deferring update:', error);
+                    });
 
                     if (i.customId === 'select-shop-section') {
                         selectedSection = i.values[0];
@@ -102,8 +117,47 @@ module.exports = {
                     }
                     else if (i.customId === 'select-shop-item') {
                         selectedItem = i.values[0];
-                        const itemPath = path.join(shopDir, selectedSection, `${selectedItem}.json`);
-                        const itemData = JSON.parse(fs.readFileSync(itemPath, 'utf8'));
+                        
+                        // Get item data from database
+                        const itemData = await new Promise((resolve, reject) => {
+                            db.get(`
+                                SELECT * FROM shop_items 
+                                WHERE id = ? OR name = ?`, 
+                                [selectedItem, selectedItem], 
+                                (err, row) => {
+                                    if (err) {
+                                        reject(err);
+                                        return;
+                                    }
+                                    
+                                    if (!row) {
+                                        reject(new Error('Item not found'));
+                                        return;
+                                    }
+                                    
+                                    // Parse modifications if exists
+                                    let modifications = null;
+                                    if (row.modifications) {
+                                        try {
+                                            modifications = JSON.parse(row.modifications);
+                                        } catch (e) {
+                                            console.error('Error parsing modifications:', e);
+                                        }
+                                    }
+                                    
+                                    resolve({
+                                        id: row.id,
+                                        name: row.name,
+                                        type: row.type,
+                                        basePrice: row.base_price,
+                                        maxCount: row.max_count,
+                                        minCount: row.min_count,
+                                        modifications: modifications,
+                                        description: row.description
+                                    });
+                                }
+                            );
+                        });
                         
                         // Validace položky
                         const validationErrors = ShopSystem.validateItem(itemData);
@@ -170,8 +224,47 @@ module.exports = {
                         const modIndex = parseInt(i.customId.split('-')[2], 10);
                         const [modName, optName, optPrice] = i.values[0].split(':');
                     
-                        const itemPath = path.join(shopDir, selectedSection, `${selectedItem}.json`);
-                        const itemData = JSON.parse(fs.readFileSync(itemPath, 'utf8'));
+                        // Get item data from database
+                        const itemData = await new Promise((resolve, reject) => {
+                            db.get(`
+                                SELECT * FROM shop_items 
+                                WHERE id = ? OR name = ?`, 
+                                [selectedItem, selectedItem], 
+                                (err, row) => {
+                                    if (err) {
+                                        reject(err);
+                                        return;
+                                    }
+                                    
+                                    if (!row) {
+                                        reject(new Error('Item not found'));
+                                        return;
+                                    }
+                                    
+                                    // Parse modifications if exists
+                                    let modifications = null;
+                                    if (row.modifications) {
+                                        try {
+                                            modifications = JSON.parse(row.modifications);
+                                        } catch (e) {
+                                            console.error('Error parsing modifications:', e);
+                                        }
+                                    }
+                                    
+                                    resolve({
+                                        id: row.id,
+                                        name: row.name,
+                                        type: row.type,
+                                        basePrice: row.base_price,
+                                        maxCount: row.max_count,
+                                        minCount: row.min_count,
+                                        modifications: modifications,
+                                        description: row.description
+                                    });
+                                }
+                            );
+                        });
+                        
                         const { modifications } = itemData;
                     
                         // Update the selected modification
@@ -212,8 +305,47 @@ module.exports = {
                             currentMods: selectedMods
                         });
                     
-                        const itemPath = path.join(shopDir, selectedSection, `${selectedItem}.json`);
-                        const itemData = JSON.parse(fs.readFileSync(itemPath, 'utf8'));
+                        // Get item data from database
+                        const itemData = await new Promise((resolve, reject) => {
+                            db.get(`
+                                SELECT * FROM shop_items 
+                                WHERE id = ? OR name = ?`, 
+                                [selectedItem, selectedItem], 
+                                (err, row) => {
+                                    if (err) {
+                                        reject(err);
+                                        return;
+                                    }
+                                    
+                                    if (!row) {
+                                        reject(new Error('Item not found'));
+                                        return;
+                                    }
+                                    
+                                    // Parse modifications if exists
+                                    let modifications = null;
+                                    if (row.modifications) {
+                                        try {
+                                            modifications = JSON.parse(row.modifications);
+                                        } catch (e) {
+                                            console.error('Error parsing modifications:', e);
+                                        }
+                                    }
+                                    
+                                    resolve({
+                                        id: row.id,
+                                        name: row.name,
+                                        type: row.type,
+                                        basePrice: row.base_price,
+                                        maxCount: row.max_count,
+                                        minCount: row.min_count,
+                                        modifications: modifications,
+                                        description: row.description
+                                    });
+                                }
+                            );
+                        });
+                        
                         const { name, basePrice, modifications } = itemData;
                     
                         // Validate modIndex
@@ -276,8 +408,47 @@ module.exports = {
                     }
                     else if (i.customId === 'prev-page' || i.customId === 'next-page') {
                         const direction = i.customId === 'next-page' ? 1 : -1;
-                        const itemPath = path.join(shopDir, selectedSection, `${selectedItem}.json`);
-                        const itemData = JSON.parse(fs.readFileSync(itemPath, 'utf8'));
+                        
+                        // Get item data from database
+                        const itemData = await new Promise((resolve, reject) => {
+                            db.get(`
+                                SELECT * FROM shop_items 
+                                WHERE id = ? OR name = ?`, 
+                                [selectedItem, selectedItem], 
+                                (err, row) => {
+                                    if (err) {
+                                        reject(err);
+                                        return;
+                                    }
+                                    
+                                    if (!row) {
+                                        reject(new Error('Item not found'));
+                                        return;
+                                    }
+                                    
+                                    // Parse modifications if exists
+                                    let modifications = null;
+                                    if (row.modifications) {
+                                        try {
+                                            modifications = JSON.parse(row.modifications);
+                                        } catch (e) {
+                                            console.error('Error parsing modifications:', e);
+                                        }
+                                    }
+                                    
+                                    resolve({
+                                        id: row.id,
+                                        name: row.name,
+                                        type: row.type,
+                                        basePrice: row.base_price,
+                                        maxCount: row.max_count,
+                                        minCount: row.min_count,
+                                        modifications: modifications,
+                                        description: row.description
+                                    });
+                                }
+                            );
+                        });
                     
                         // Get current pages structure
                         const { pages, totalModifications } = createModificationPages(itemData.modifications, selectedMods);
@@ -290,8 +461,36 @@ module.exports = {
                     }
                     else if (i.customId === 'select-count') {
                         const count = parseInt(i.values[0]);
-                        const itemPath = path.join(shopDir, selectedSection, `${selectedItem}.json`);
-                        const itemData = JSON.parse(fs.readFileSync(itemPath, 'utf8'));
+                        
+                        // Get item data from database
+                        const itemData = await new Promise((resolve, reject) => {
+                            db.get(`
+                                SELECT * FROM shop_items 
+                                WHERE id = ? OR name = ?`, 
+                                [selectedItem, selectedItem], 
+                                (err, row) => {
+                                    if (err) {
+                                        reject(err);
+                                        return;
+                                    }
+                                    
+                                    if (!row) {
+                                        reject(new Error('Item not found'));
+                                        return;
+                                    }
+                                    
+                                    resolve({
+                                        id: row.id,
+                                        name: row.name,
+                                        type: row.type,
+                                        basePrice: row.base_price,
+                                        maxCount: row.max_count,
+                                        minCount: row.min_count,
+                                        description: row.description
+                                    });
+                                }
+                            );
+                        });
                         
                         itemState.selectedCount = count;
                         const countDisplay = createCountableDisplay(itemData, count);
@@ -303,10 +502,15 @@ module.exports = {
                     }
                     else if (i.customId === 'buy-item') {
                         try {
-                            // Kontrola členství ve frakci
+                            // Buy-item logic
                             const member = interaction.member;
-                            const fractionRole = member.roles.cache.find(role => 
-                                fs.existsSync(path.join(__dirname, '../../files/Fractions', role.name)));
+                            const fractionRole = member.roles.cache.find(role => {
+                                return new Promise((resolve) => {
+                                    getFractionByName(role.name, (err, fraction) => {
+                                        resolve(fraction != null);
+                                    });
+                                });
+                            });
                             
                             if (!fractionRole) {
                                 return await i.editReply({
@@ -315,33 +519,84 @@ module.exports = {
                                     embeds: []
                                 });
                             }
+                            
+                            // Get fraction data
+                            const fractionData = await new Promise((resolve, reject) => {
+                                getFractionByName(fractionRole.name, (err, fraction) => {
+                                    if (err) {
+                                        reject(err);
+                                        return;
+                                    }
+                                    if (!fraction) {
+                                        reject(new Error('Fraction not found'));
+                                        return;
+                                    }
+                                    resolve(fraction);
+                                });
+                            });
                     
-                            const fractionPath = path.join(__dirname, '../../files/Fractions', fractionRole.name);
-                            const fractionData = JSON.parse(fs.readFileSync(path.join(fractionPath, `${fractionRole.name}.json`)));
-                    
-                            const itemPath = path.join(shopDir, selectedSection, `${selectedItem}.json`);
-                            const itemData = JSON.parse(fs.readFileSync(itemPath, 'utf8'));
-                            const { name, basePrice, maxCount } = itemData;
+                            // Get item data from database
+                            const itemData = await new Promise((resolve, reject) => {
+                                db.get(`
+                                    SELECT * FROM shop_items 
+                                    WHERE id = ? OR name = ?`, 
+                                    [selectedItem, selectedItem], 
+                                    (err, row) => {
+                                        if (err) {
+                                            reject(err);
+                                            return;
+                                        }
+                                        
+                                        if (!row) {
+                                            reject(new Error('Item not found'));
+                                            return;
+                                        }
+                                        
+                                        // Parse modifications if exists
+                                        let modifications = null;
+                                        if (row.modifications) {
+                                            try {
+                                                modifications = JSON.parse(row.modifications);
+                                            } catch (e) {
+                                                console.error('Error parsing modifications:', e);
+                                            }
+                                        }
+                                        
+                                        resolve({
+                                            id: row.id,
+                                            name: row.name,
+                                            type: row.type,
+                                            basePrice: row.base_price,
+                                            maxCount: row.max_count,
+                                            minCount: row.min_count,
+                                            modifications: modifications,
+                                            description: row.description
+                                        });
+                                    }
+                                );
+                            });
+                            
+                            const { id, name, basePrice, maxCount } = itemData;
 
                             // For countable items, check current count and limits
                             if (itemData.type === 'countable') {
                                 // Get all existing items of this type in the fraction
-                                const fractionSectionPath = path.join(fractionPath, selectedSection);
-                                let currentCount = 0;
-                    
-                                if (fs.existsSync(fractionSectionPath)) {
-                                    const existingFiles = fs.readdirSync(fractionSectionPath)
-                                        .filter(file => file.endsWith('.json'));
-                    
-                                    for (const file of existingFiles) {
-                                        const existingItem = JSON.parse(
-                                            fs.readFileSync(path.join(fractionSectionPath, file))
-                                        );
-                                        if (existingItem.name === name) {
-                                            currentCount += existingItem.count || 0;
+                                const currentCount = await new Promise((resolve, reject) => {
+                                    db.get(`
+                                        SELECT SUM(count) as totalCount 
+                                        FROM purchases p
+                                        JOIN shop_items si ON p.item_id = si.id
+                                        WHERE p.fraction_id = ? AND si.name = ?`,
+                                        [fractionData.id, name],
+                                        (err, row) => {
+                                            if (err) {
+                                                reject(err);
+                                                return;
+                                            }
+                                            resolve(row?.totalCount || 0);
                                         }
-                                    }
-                                }
+                                    );
+                                });
                     
                                 // Check if new purchase would exceed limit
                                 const newTotalCount = currentCount + itemState.selectedCount;
@@ -423,184 +678,323 @@ module.exports = {
                                 components: [confirmRow]
                             });
                     
-                            // Collector pro potvrzení
-                            const confirmCollector = i.message.createMessageComponentCollector({
-                                filter: response => response.user.id === interaction.user.id,
-                                time: 30000,
-                                max: 1
-                            });
-                    
-                            confirmCollector.on('collect', async confirm => {
-                                if (confirm.customId === 'confirm-purchase') {
+                            try {
+                                // Setup confirm collector
+                                const confirmCollector = i.message.createMessageComponentCollector({
+                                    filter: response => response.user.id === interaction.user.id,
+                                    time: 30000,
+                                    max: 1
+                                });
+                                
+                                confirmCollector.on('collect', async confirm => {
                                     try {
-                                        const fractionSectionPath = path.join(fractionPath, selectedSection);
-                                        if (!fs.existsSync(fractionSectionPath)) {
-                                            fs.mkdirSync(fractionSectionPath, { recursive: true });
-                                        }
-                            
-                                        let purchaseData;
-                                        let uniqueId;
-                            
-                                        if (itemData.type === 'countable') {
-                                            const existingFiles = fs.readdirSync(fractionSectionPath)
-                                                .filter(file => file.endsWith('.json'));
-                                            
-                                            let existingItem = null;
-                                            let existingItemPath = null;
-                            
-                                            for (const file of existingFiles) {
-                                                const itemPath = path.join(fractionSectionPath, file);
-                                                const item = JSON.parse(fs.readFileSync(itemPath));
+                                        if (confirm.customId === 'confirm-purchase') {
+                                            try {
+                                                let purchaseData;
+                                                let purchaseId;
+                                
+                                                if (itemData.type === 'countable') {
+                                                    // Check if we already have this item
+                                                    const existingItem = await new Promise((resolve, reject) => {
+                                                        db.get(`
+                                                            SELECT p.* 
+                                                            FROM purchases p
+                                                            JOIN shop_items si ON p.item_id = si.id
+                                                            WHERE p.fraction_id = ? AND si.name = ?
+                                                            LIMIT 1`,
+                                                            [fractionData.id, itemData.name],
+                                                            (err, row) => {
+                                                                if (err) {
+                                                                    reject(err);
+                                                                    return;
+                                                                }
+                                                                resolve(row);
+                                                            }
+                                                        );
+                                                    });
+                                                    
+                                                    if (existingItem) {
+                                                        // Update existing item
+                                                        const newCount = existingItem.count + itemState.selectedCount;
+                                                        const newTotalPrice = newCount * itemData.basePrice;
+                                                        
+                                                        await new Promise((resolve, reject) => {
+                                                            db.run(`
+                                                                UPDATE purchases 
+                                                                SET count = ?, total_price = ? 
+                                                                WHERE id = ?`,
+                                                                [newCount, newTotalPrice, existingItem.id],
+                                                                (err) => {
+                                                                    if (err) {
+                                                                        reject(err);
+                                                                        return;
+                                                                    }
+                                                                    resolve();
+                                                                }
+                                                            );
+                                                        });
+                                                        
+                                                        purchaseId = existingItem.id;
+                                                        purchaseData = {
+                                                            id: purchaseId,
+                                                            name: itemData.name,
+                                                            basePrice: itemData.basePrice,
+                                                            count: newCount,
+                                                            totalPrice: newTotalPrice
+                                                        };
+                                                    } else {
+                                                        // Create new item
+                                                        const totalPrice = itemData.basePrice * itemState.selectedCount;
+                                                        
+                                                        purchaseId = await new Promise((resolve, reject) => {
+                                                            db.run(`
+                                                                INSERT INTO purchases (
+                                                                    fraction_id, item_id, count, selected_mods, 
+                                                                    total_price, purchase_date, buyer
+                                                                ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                                                                [
+                                                                    fractionData.id,
+                                                                    itemData.id,
+                                                                    itemState.selectedCount,
+                                                                    null,
+                                                                    totalPrice,
+                                                                    new Date().toISOString(),
+                                                                    interaction.user.tag
+                                                                ],
+                                                                function(err) {
+                                                                    if (err) {
+                                                                        reject(err);
+                                                                        return;
+                                                                    }
+                                                                    resolve(this.lastID);
+                                                                }
+                                                            );
+                                                        });
+                                                        
+                                                        purchaseData = {
+                                                            id: purchaseId,
+                                                            name: itemData.name,
+                                                            basePrice: itemData.basePrice,
+                                                            count: itemState.selectedCount,
+                                                            totalPrice: totalPrice
+                                                        };
+                                                    }
+                                                } else {
+                                                    // Handle modifiable items
+                                                    const totalPrice = calculateTotalPrice(itemData.basePrice, selectedMods);
+                                                    const selectedModsJson = JSON.stringify(selectedMods);
+                                                    
+                                                    purchaseId = await new Promise((resolve, reject) => {
+                                                        db.run(`
+                                                            INSERT INTO purchases (
+                                                                fraction_id, item_id, count, selected_mods, 
+                                                                total_price, purchase_date, buyer
+                                                            ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                                                            [
+                                                                fractionData.id,
+                                                                itemData.id,
+                                                                1, // Modifiable items always have count=1
+                                                                selectedModsJson,
+                                                                totalPrice,
+                                                                new Date().toISOString(),
+                                                                interaction.user.tag
+                                                            ],
+                                                            function(err) {
+                                                                if (err) {
+                                                                    reject(err);
+                                                                    return;
+                                                                }
+                                                                resolve(this.lastID);
+                                                            }
+                                                        );
+                                                    });
+                                                    
+                                                    purchaseData = {
+                                                        id: purchaseId,
+                                                        name: itemData.name,
+                                                        basePrice: itemData.basePrice,
+                                                        selectedMods: selectedMods,
+                                                        totalPrice: totalPrice,
+                                                        count: 1
+                                                    };
+                                                }
+                                
+                                                // Update fraction money
+                                                const totalPrice = itemData.type === 'countable' 
+                                                    ? itemData.basePrice * itemState.selectedCount 
+                                                    : calculateTotalPrice(itemData.basePrice, selectedMods);
+                                                    
+                                                try {
+                                                    await updateFractionMoney(fractionData.id, totalPrice, false);
+                                                } catch (moneyError) {
+                                                    console.error('Error updating fraction money:', moneyError);
+                                                    // Continue execution - the purchase data is already saved in the database
+                                                    ShopLogger.log('Money Update Error', {
+                                                        fractionId: fractionData.id,
+                                                        totalPrice,
+                                                        error: moneyError.message
+                                                    });
+                                                }
                                                 
-                                                if (item.name === name && item.basePrice === basePrice) {
-                                                    existingItem = item;
-                                                    existingItemPath = itemPath;
-                                                    uniqueId = file.replace('.json', ''); // Get existing ID
-                                                    break;
+                                                // Create purchase confirmation embed with updated information
+                                                const purchaseEmbed = new EmbedBuilder()
+                                                    .setColor(0x00FF00)
+                                                    .setTitle(`${getEmoji('success')} Nákup dokončen`)
+                                                    .setDescription(`**${interaction.user.tag}** zakoupil/a pro frakci **${fractionRole.name}**:`)
+                                                    .addFields(
+                                                        { name: 'Položka', value: name, inline: true },
+                                                        { name: 'Sekce', value: selectedSection, inline: true },
+                                                        { name: 'Celková cena', value: `${totalPrice} ${getEmoji('money')}`, inline: true }
+                                                    );
+                                
+                                                // Add type-specific fields
+                                                if (itemData.type === 'countable') {
+                                                    purchaseEmbed.addFields(
+                                                        { name: 'Přidané množství', value: `${itemState.selectedCount}x`, inline: true },
+                                                        { name: 'Celkové množství', value: `${purchaseData.count}x`, inline: true }
+                                                    );
+                                                } else {
+                                                    purchaseEmbed.addFields(
+                                                        { name: 'Vybrané možnosti', value: selectedOptions.length > 0 ? selectedOptions.join('\n') : 'Žádné možnosti' }
+                                                    );
+                                                }
+                                
+                                                purchaseEmbed.addFields(
+                                                    { name: 'Nový stav účtu', value: `${fractionData.money} ${getEmoji('money')}` },
+                                                    { name: 'ID předmětu', value: purchaseData.id }
+                                                ).setTimestamp();
+                                
+                                                // Update original message
+                                                try {
+                                                    await confirm.update({
+                                                        content: '✅ Nákup byl úspěšně dokončen',
+                                                        embeds: [],
+                                                        components: []
+                                                    });
+                                                } catch (updateError) {
+                                                    console.error('Error updating confirmation message:', updateError);
+                                                    // If updating fails, try to send a new message instead
+                                                    try {
+                                                        await interaction.followUp({
+                                                            content: '✅ Nákup byl úspěšně dokončen',
+                                                            ephemeral: true
+                                                        });
+                                                    } catch (followUpError) {
+                                                        console.error('Failed to send follow-up message:', followUpError);
+                                                    }
+                                                }
+                                
+                                                // Send confirmation to channel
+                                                await interaction.channel.send({ embeds: [purchaseEmbed] }).catch(err => {
+                                                    console.error('Error sending purchase confirmation to channel:', err);
+                                                });
+                                
+                                                ShopLogger.log('Purchase Completed', {
+                                                    itemId: purchaseId,
+                                                    buyer: interaction.user.tag,
+                                                    fraction: fractionRole.name,
+                                                    totalPrice
+                                                });
+                                
+                                            } catch (error) {
+                                                console.error('Purchase confirmation error:', error);
+                                                try {
+                                                    await confirm.update({
+                                                        content: '❌ Nastala chyba při zpracování nákupu',
+                                                        embeds: [],
+                                                        components: []
+                                                    });
+                                                } catch (updateError) {
+                                                    console.error('Error updating error message:', updateError);
+                                                    try {
+                                                        await interaction.followUp({
+                                                            content: '❌ Nastala chyba při zpracování nákupu',
+                                                            ephemeral: true
+                                                        });
+                                                    } catch (followUpError) {
+                                                        console.error('Failed to send error follow-up:', followUpError);
+                                                    }
                                                 }
                                             }
-                            
-                                            if (existingItem) {
-                                                // Update existing item
-                                                existingItem.count += itemState.selectedCount;
-                                                existingItem.totalPrice = existingItem.count * basePrice;
-                                                fs.writeFileSync(existingItemPath, JSON.stringify(existingItem, null, 2));
-                                                purchaseData = existingItem;
-                                            } else {
-                                                // Create new item
-                                                uniqueId = Date.now().toString(36) + Math.random().toString(36).substr(2);
-                                                purchaseData = {
-                                                    id: uniqueId,
-                                                    name,
-                                                    basePrice,
-                                                    count: itemState.selectedCount,
-                                                    totalPrice: itemData.basePrice * itemState.selectedCount,
-                                                    purchaseDate: new Date().toISOString(),
-                                                    buyer: interaction.user.tag
-                                                };
-                            
-                                                fs.writeFileSync(
-                                                    path.join(fractionSectionPath, `${uniqueId}.json`),
-                                                    JSON.stringify(purchaseData, null, 2)
-                                                );
+                                        } else {
+                                            // Handle purchase cancellation
+                                            try {
+                                                await confirm.update({
+                                                    content: '❌ Nákup byl zrušen',
+                                                    embeds: [],
+                                                    components: []
+                                                });
+                                            } catch (updateError) {
+                                                console.error('Error updating cancellation message:', updateError);
+                                                try {
+                                                    await interaction.followUp({
+                                                        content: '❌ Nákup byl zrušen',
+                                                        ephemeral: true
+                                                    });
+                                                } catch (followUpError) {
+                                                    console.error('Failed to send cancellation follow-up:', followUpError);
+                                                }
                                             }
-                                        } else {
-                                            // Handle modifiable items
-                                            uniqueId = Date.now().toString(36) + Math.random().toString(36).substr(2);
-                                            purchaseData = {
-                                                id: uniqueId,
-                                                name,
-                                                basePrice,
-                                                selectedMods,
-                                                totalPrice,
-                                                purchaseDate: new Date().toISOString(),
-                                                buyer: interaction.user.tag
-                                            };
-                            
-                                            fs.writeFileSync(
-                                                path.join(fractionSectionPath, `${uniqueId}.json`),
-                                                JSON.stringify(purchaseData, null, 2)
-                                            );
                                         }
-                            
-                                        // Update fraction money
-                                        fractionData.money -= totalPrice;
-                                        fs.writeFileSync(
-                                            path.join(fractionPath, `${fractionRole.name}.json`),
-                                            JSON.stringify(fractionData, null, 2)
-                                        );
-                            
-                                        // Create purchase confirmation embed with updated information
-                                        const purchaseEmbed = new EmbedBuilder()
-                                            .setColor(0x00FF00)
-                                            .setTitle(`${getEmoji('success')} Nákup dokončen`)
-                                            .setDescription(`**${interaction.user.tag}** zakoupil/a pro frakci **${fractionRole.name}**:`)
-                                            .addFields(
-                                                { name: 'Položka', value: name, inline: true },
-                                                { name: 'Sekce', value: selectedSection, inline: true },
-                                                { name: 'Celková cena', value: `${totalPrice} ${getEmoji('money')}`, inline: true }
-                                            );
-                            
-                                        // Add type-specific fields
-                                        if (itemData.type === 'countable') {
-                                            purchaseEmbed.addFields(
-                                                { name: 'Přidané množství', value: `${itemState.selectedCount}x`, inline: true },
-                                                { name: 'Celkové množství', value: `${purchaseData.count}x`, inline: true }
-                                            );
-                                        } else {
-                                            purchaseEmbed.addFields(
-                                                { name: 'Vybrané možnosti', value: selectedOptions.length > 0 ? selectedOptions.join('\n') : 'Žádné možnosti' }
-                                            );
+                                    } catch (collectError) {
+                                        console.error('Error handling confirmation:', collectError);
+                                        try {
+                                            await interaction.followUp({
+                                                content: '❌ Nastala chyba při zpracování vaší volby.',
+                                                ephemeral: true
+                                            });
+                                        } catch (followUpError) {
+                                            console.error('Failed to send error message:', followUpError);
                                         }
-                            
-                                        purchaseEmbed.addFields(
-                                            { name: 'Nový stav účtu', value: `${fractionData.money} ${getEmoji('money')}` },
-                                            { name: 'ID předmětu', value: purchaseData.id }
-                                        ).setTimestamp();
-                            
-                                        // Update original message
-                                        await i.editReply({
-                                            content: '✅ Nákup byl úspěšně dokončen',
-                                            embeds: [],
-                                            components: []
-                                        });
-                            
-                                        // Send confirmation to channel
-                                        await interaction.channel.send({ embeds: [purchaseEmbed] });
-                            
-                                        ShopLogger.log('Purchase Completed', {
-                                            itemId: uniqueId,
-                                            buyer: interaction.user.tag,
-                                            fraction: fractionRole.name,
-                                            totalPrice
-                                        });
-                            
-                                    } catch (error) {
-                                        console.error('Purchase confirmation error:', error);
-                                        await i.editReply({
-                                            content: '❌ Nastala chyba při zpracování nákupu',
-                                            embeds: [],
-                                            components: []
-                                        });
                                     }
-                                } else {
-                                    // Handle purchase cancellation
+                                });
+                                
+                                // Also setup end event handler
+                                confirmCollector.on('end', async (collected, reason) => {
+                                    if (reason === 'time') {
+                                        try {
+                                            await i.editReply({
+                                                content: '⌛ Vypršel čas na potvrzení nákupu',
+                                                embeds: [],
+                                                components: []
+                                            }).catch(error => {
+                                                console.error('Timeout edit reply error:', error);
+                                                interaction.followUp({
+                                                    content: '⌛ Vypršel čas na potvrzení nákupu',
+                                                    ephemeral: true
+                                                }).catch(e => console.error('Failed to send timeout follow-up:', e));
+                                            });
+                                        } catch (error) {
+                                            console.error('Timeout handler error:', error);
+                                            // Try to send a follow-up message as a last resort
+                                            try {
+                                                await interaction.followUp({
+                                                    content: '⌛ Vypršel čas na potvrzení nákupu',
+                                                    ephemeral: true
+                                                });
+                                            } catch (e) {
+                                                console.error('Failed to send any timeout message:', e);
+                                            }
+                                        }
+                                    }
+                                });
+                            } catch (innerError) {
+                                console.error('Error in buy-item inner block:', innerError);
+                                ShopLogger.log('Purchase Inner Error', {
+                                    error: innerError.message,
+                                    stack: innerError.stack
+                                });
+                                
+                                try {
                                     await i.editReply({
-                                        content: '❌ Nákup byl zrušen',
-                                        embeds: [],
-                                        components: []
+                                        content: '❌ Nastala vnitřní chyba při zpracování nákupu.',
+                                        components: [],
+                                        embeds: []
                                     });
+                                } catch (replyError) {
+                                    console.error('Error sending inner error message:', replyError);
                                 }
-                            });
-                            
-                            confirmCollector.on('end', async (collected, reason) => {
-                                if (reason === 'time' && !collected.size) {
-                                    try {
-                                        await i.editReply({
-                                            content: '⌛ Vypršel čas na potvrzení nákupu',
-                                            embeds: [],
-                                            components: []
-                                        });
-                                    } catch (error) {
-                                        console.error('Timeout handler error:', error);
-                                    }
-                                }
-                            });
-                            
-                            confirmCollector.on('end', async (collected, reason) => {
-                                if (reason === 'time') {
-                                    try {
-                                        await i.editReply({
-                                            content: '⌛ Vypršel čas na potvrzení nákupu',
-                                            components: [],
-                                            embeds: []
-                                        });
-                                    } catch (error) {
-                                        console.error('Timeout handler error:', error);
-                                    }
-                                }
-                            });
-                    
+                            }
                         } catch (error) {
                             console.error('Error in buy-item:', error);
                             ShopLogger.log('Purchase Error', {
@@ -615,21 +1009,25 @@ module.exports = {
                             });
                         }
                     }
-                    // In the collector.on('collect') handler, update the back button logic:
                     else if (i.customId === 'back-to-items') {
                         try {
-                            // Get items for the current section
-                            const sectionDir = path.join(shopDir, selectedSection);
-                            const items = fs.readdirSync(sectionDir, { withFileTypes: true })
-                                .filter(dirent => dirent.isFile() && dirent.name.endsWith('.json'))
-                                .map(dirent => dirent.name.replace('.json', ''));
+                            // Get items from database for the current section
+                            const items = await new Promise((resolve, reject) => {
+                                getShopItems(selectedSection, (err, rows) => {
+                                    if (err) {
+                                        reject(err);
+                                        return;
+                                    }
+                                    resolve(rows);
+                                });
+                            });
                     
                             const itemMenu = new StringSelectMenuBuilder()
                                 .setCustomId('select-shop-item')
                                 .setPlaceholder('Vyberte položku k zobrazení')
                                 .addOptions(items.map(item => ({
-                                    label: item,
-                                    value: item
+                                    label: item.name,
+                                    value: item.id.toString()
                                 })));
                     
                             const sectionEmbed = new EmbedBuilder()
@@ -694,7 +1092,14 @@ module.exports = {
                         await interaction.editReply({
                             embeds: [timeoutEmbed],
                             components: []
-                        }).catch(() => {});
+                        }).catch(error => {
+                            console.error('Error updating timeout message:', error);
+                            // If updating fails, try to send a new message instead
+                            interaction.followUp({
+                                content: '⌛ Časový limit vypršel. Pro nový nákup použijte příkaz znovu.',
+                                ephemeral: true
+                            }).catch(e => console.error('Failed to send timeout follow-up:', e));
+                        });
                     } catch (error) {
                         console.error('Error in collector end:', error);
                         ShopLogger.log('Timeout Error', {

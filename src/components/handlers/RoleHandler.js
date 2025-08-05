@@ -1,6 +1,5 @@
 const { EmbedBuilder } = require('discord.js');
-const fs = require('fs');
-const path = require('path');
+const { getFractionByName, addAuditLog } = require('../../Database/database');
 
 async function handleRoleResponse(interaction) {
     const [action, userId, fractionName, makeDeputy] = interaction.customId.split(':');
@@ -36,10 +35,36 @@ async function handleRoleResponse(interaction) {
 async function processRoleAccept(interaction, fractionName, makeDeputy) {
     // Check if user is already in any fraction
     const member = interaction.member;
-    const hasAnyFraction = member.roles.cache.some(r => 
-        fs.existsSync(path.join(__dirname, '../../files/Fractions', r.name))
-    );
-
+    
+    // Zkontrolujeme, zda má uživatel nějakou roli frakce v databázi
+    let hasAnyFraction = false;
+    
+    // Získáme seznam všech frakcí z rolí uživatele
+    const userRoles = member.roles.cache;
+    
+    // Pro každou roli zkontrolujeme, zda existuje frakce s tímto názvem
+    for (const role of userRoles.values()) {
+        try {
+            const fraction = await new Promise((resolve) => {
+                getFractionByName(role.name, (err, fraction) => {
+                    if (err) {
+                        console.error(`Error checking fraction for role ${role.name}:`, err);
+                        resolve(null);
+                    } else {
+                        resolve(fraction);
+                    }
+                });
+            });
+            
+            if (fraction) {
+                hasAnyFraction = true;
+                break;
+            }
+        } catch (error) {
+            console.error(`Error checking fraction for role ${role.name}:`, error);
+        }
+    }
+    
     if (hasAnyFraction) {
         return await interaction.followUp({
             content: '❌ Již jste členem jiné frakce.',
@@ -59,6 +84,18 @@ async function processRoleAccept(interaction, fractionName, makeDeputy) {
 
         // Add roles
         await member.roles.add(roles);
+        
+        // Přidat audit log
+        addAuditLog(
+            interaction.user.id,
+            'accept_role_invite',
+            'role',
+            fractionName,
+            JSON.stringify({
+                fraction: fractionName,
+                makeDeputy: makeDeputy
+            })
+        );
 
         // Update embed
         const updatedEmbed = EmbedBuilder.from(interaction.message.embeds[0])
@@ -91,6 +128,17 @@ async function processRoleAccept(interaction, fractionName, makeDeputy) {
 
 async function processRoleDecline(interaction, fractionName) {
     try {
+        // Přidat audit log
+        addAuditLog(
+            interaction.user.id,
+            'decline_role_invite',
+            'role',
+            fractionName,
+            JSON.stringify({
+                fraction: fractionName
+            })
+        );
+        
         const updatedEmbed = EmbedBuilder.from(interaction.message.embeds[0])
             .setColor(0xFF0000)
             .setTitle('❌ Pozvánka odmítnuta')
@@ -165,6 +213,19 @@ async function processPermissionAccept(interaction, targetMember, fractionName, 
             const deputyRole = interaction.guild.roles.cache.find(r => r.name === `Zástupce ${fractionName}`);
             await targetMember.roles.add(deputyRole);
         }
+        
+        // Přidat audit log
+        addAuditLog(
+            interaction.user.id,
+            'accept_permission_request',
+            'permission',
+            targetMember.id,
+            JSON.stringify({
+                fraction: fractionName,
+                requestType: requestType,
+                userId: targetMember.id
+            })
+        );
 
         const updatedEmbed = EmbedBuilder.from(interaction.message.embeds[0])
             .setColor(0x00FF00)
@@ -196,6 +257,19 @@ async function processPermissionAccept(interaction, targetMember, fractionName, 
 
 async function processPermissionDeny(interaction, targetMember, fractionName, requestType) {
     try {
+        // Přidat audit log
+        addAuditLog(
+            interaction.user.id,
+            'deny_permission_request',
+            'permission',
+            targetMember.id,
+            JSON.stringify({
+                fraction: fractionName,
+                requestType: requestType,
+                userId: targetMember.id
+            })
+        );
+        
         const updatedEmbed = EmbedBuilder.from(interaction.message.embeds[0])
             .setColor(0xFF0000)
             .setTitle('❌ Žádost zamítnuta')

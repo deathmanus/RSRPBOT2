@@ -1,8 +1,7 @@
-const fs = require('fs');
-const path = require('path');
+const { db } = require('../Database/database');
 
 class ConfigSystem {
-    static configDir = path.join(__dirname, '../files/config');
+    static CONFIG_TABLE = 'config';
     static cache = new Map();
     static defaults = {
         shop: {
@@ -22,16 +21,36 @@ class ConfigSystem {
     };
 
     static initialize() {
-        if (!fs.existsSync(this.configDir)) {
-            fs.mkdirSync(this.configDir, { recursive: true });
-        }
+        // Vytvoření tabulky config, pokud neexistuje
+        db.run(`CREATE TABLE IF NOT EXISTS ${this.CONFIG_TABLE} (
+            key TEXT PRIMARY KEY,
+            value TEXT,
+            updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )`);
 
-        // Initialize default configs if they don't exist
+        // Inicializace výchozích konfigurací v databázi
         for (const [key, value] of Object.entries(this.defaults)) {
-            const configPath = path.join(this.configDir, `${key}.json`);
-            if (!fs.existsSync(configPath)) {
-                fs.writeFileSync(configPath, JSON.stringify(value, null, 2));
-            }
+            db.get(`SELECT value FROM ${this.CONFIG_TABLE} WHERE key = ?`, [key], (err, row) => {
+                if (err) {
+                    console.error(`Error checking config for ${key}:`, err);
+                    return;
+                }
+                
+                if (!row) {
+                    // Pokud konfigurace neexistuje, vytvoříme ji s výchozími hodnotami
+                    db.run(
+                        `INSERT INTO ${this.CONFIG_TABLE} (key, value) VALUES (?, ?)`,
+                        [key, JSON.stringify(value)],
+                        (err) => {
+                            if (err) {
+                                console.error(`Error creating default config for ${key}:`, err);
+                            } else {
+                                console.log(`Created default config for ${key}`);
+                            }
+                        }
+                    );
+                }
+            });
         }
     }
 
@@ -40,46 +59,132 @@ class ConfigSystem {
             return this.cache.get(section);
         }
 
-        const configPath = path.join(this.configDir, `${section}.json`);
-        if (!fs.existsSync(configPath)) {
-            // If config doesn't exist, create it with defaults
-            if (this.defaults[section]) {
-                fs.writeFileSync(configPath, JSON.stringify(this.defaults[section], null, 2));
-                this.cache.set(section, this.defaults[section]);
-                return this.defaults[section];
-            }
-            throw new Error(`Configuration section '${section}' not found`);
+        return new Promise((resolve, reject) => {
+            db.get(`SELECT value FROM ${this.CONFIG_TABLE} WHERE key = ?`, [section], (err, row) => {
+                if (err) {
+                    console.error(`Error reading config for ${section}:`, err);
+                    reject(err);
+                    return;
+                }
+                
+                if (!row) {
+                    // Pokud konfigurace neexistuje, vytvoříme ji s výchozími hodnotami
+                    if (this.defaults[section]) {
+                        db.run(
+                            `INSERT INTO ${this.CONFIG_TABLE} (key, value) VALUES (?, ?)`,
+                            [section, JSON.stringify(this.defaults[section])],
+                            (insertErr) => {
+                                if (insertErr) {
+                                    console.error(`Error creating default config for ${section}:`, insertErr);
+                                    reject(insertErr);
+                                } else {
+                                    this.cache.set(section, this.defaults[section]);
+                                    resolve(this.defaults[section]);
+                                }
+                            }
+                        );
+                    } else {
+                        const error = new Error(`Configuration section '${section}' not found`);
+                        reject(error);
+                    }
+                } else {
+                    try {
+                        const config = JSON.parse(row.value);
+                        this.cache.set(section, config);
+                        resolve(config);
+                    } catch (parseErr) {
+                        console.error(`Error parsing config for ${section}:`, parseErr);
+                        reject(parseErr);
+                    }
+                }
+            });
+        });
+    }
+
+    // Synchronní verze get pro zpětnou kompatibilitu
+    static getSync(section) {
+        if (this.cache.has(section)) {
+            return this.cache.get(section);
         }
 
-        const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-        this.cache.set(section, config);
-        return config;
+        try {
+            const config = this.defaults[section] || {};
+            console.warn(`Using default config for ${section} in sync mode`);
+            this.cache.set(section, config);
+            return config;
+        } catch (error) {
+            console.error(`Error in getSync for ${section}:`, error);
+            throw new Error(`Configuration section '${section}' not found`);
+        }
     }
 
     static set(section, key, value) {
-        const config = this.get(section);
-        const keys = key.split('.');
-        let current = config;
+        return new Promise((resolve, reject) => {
+            this.get(section)
+                .then(config => {
+                    const keys = key.split('.');
+                    let current = config;
 
-        for (let i = 0; i < keys.length - 1; i++) {
-            if (!(keys[i] in current)) {
-                current[keys[i]] = {};
-            }
-            current = current[keys[i]];
-        }
+                    for (let i = 0; i < keys.length - 1; i++) {
+                        if (!(keys[i] in current)) {
+                            current[keys[i]] = {};
+                        }
+                        current = current[keys[i]];
+                    }
 
-        current[keys[keys.length - 1]] = value;
-        
-        const configPath = path.join(this.configDir, `${section}.json`);
-        fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
-        this.cache.set(section, config);
-        
-        return config;
+                    current[keys[keys.length - 1]] = value;
+                    
+                    db.run(
+                        `UPDATE ${this.CONFIG_TABLE} SET value = ?, updated_at = CURRENT_TIMESTAMP WHERE key = ?`,
+                        [JSON.stringify(config), section],
+                        (err) => {
+                            if (err) {
+                                console.error(`Error updating config for ${section}:`, err);
+                                reject(err);
+                            } else {
+                                this.cache.set(section, config);
+                                resolve(config);
+                            }
+                        }
+                    );
+                })
+                .catch(reject);
+        });
     }
 
     static clearCache() {
         this.cache.clear();
     }
+
+    // Získá všechny konfigurace
+    static getAllConfigs() {
+        return new Promise((resolve, reject) => {
+            db.all(`SELECT key, value, updated_at FROM ${this.CONFIG_TABLE}`, [], (err, rows) => {
+                if (err) {
+                    console.error('Error fetching all configs:', err);
+                    reject(err);
+                    return;
+                }
+                
+                const configs = {};
+                rows.forEach(row => {
+                    try {
+                        configs[row.key] = {
+                            data: JSON.parse(row.value),
+                            updatedAt: row.updated_at
+                        };
+                    } catch (parseErr) {
+                        console.error(`Error parsing config for ${row.key}:`, parseErr);
+                    }
+                });
+                
+                resolve(configs);
+            });
+        });
+    }
 }
+
+// Inicializace na začátku
+ConfigSystem.initialize();
 
 module.exports = ConfigSystem;

@@ -1,32 +1,59 @@
 const { EmbedBuilder, ButtonBuilder, ActionRowBuilder, ButtonStyle, ChannelType, PermissionsBitField, StringSelectMenuBuilder } = require('discord.js');
 const fs = require('fs');
 const path = require('path');
+const { getTicketConfig, initTicketConfig, updateFractionMoney, getFractionById, getFractionByName } = require('../../Database/database');
 
 class TicketHandler {
     static usedResponses = new Map(); // Track used responses per channel
     static rewardsClaimed = new Map();
 
     static async handleTicketCreate(interaction) {
-        const config = JSON.parse(fs.readFileSync(path.join(__dirname, '../../files/TicketSystem/ticket-config.json'), 'utf-8'));
-        const category = config.categories.find(c => c.id === interaction.values[0]);
-        if (!category) return;
+        try {
+            // Ihned odložíme odpověď, abychom zabránili vypršení interakce
+            await interaction.deferUpdate().catch(e => console.error('Failed to defer update:', e));
+            
+            // Načtení konfigurace z databáze
+            const config = await new Promise((resolve, reject) => {
+                getTicketConfig((err, config) => {
+                    if (err) reject(err);
+                    else resolve(config);
+                });
+            });
+            
+            // Pokud konfigurace neexistuje, inicializuj ji z původního souboru
+            if (!config) {
+                await initTicketConfig();
+                try {
+                    await interaction.followUp({ 
+                        content: 'Ticket systém byl inicializován. Prosím zkuste to znovu.',
+                        ephemeral: true
+                    });
+                } catch (e) {
+                    console.error('Failed to send initialization message:', e);
+                }
+                return;
+            }
+            
+            const category = config.categories.find(c => c.id === interaction.values[0]);
+            if (!category) return;
 
-        const channel = await interaction.guild.channels.create({
-            name: `ticket-${interaction.user.username}-${interaction.user.id}`,
-            type: ChannelType.GuildText,
-            parent: category.categoryId,
-            permissionOverwrites: [
-                {
-                    id: interaction.guild.id,
-                    deny: [PermissionsBitField.Flags.ViewChannel],
-                },
-                {
-                    id: interaction.user.id,
-                    allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages],
-                },
-            ],
-        });
+            const channel = await interaction.guild.channels.create({
+                name: `ticket-${interaction.user.username}-${interaction.user.id}`,
+                type: ChannelType.GuildText,
+                parent: category.categoryId,
+                permissionOverwrites: [
+                    {
+                        id: interaction.guild.id,
+                        deny: [PermissionsBitField.Flags.ViewChannel],
+                    },
+                    {
+                        id: interaction.user.id,
+                        allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages],
+                    },
+                ],
+            });
 
+        
         // Initialize used responses tracking for this channel
         this.usedResponses.set(channel.id, new Set());
 
@@ -43,7 +70,14 @@ class TicketHandler {
                 embed.setImage(category.message.image);
             } catch {
                 // It's not a URL, try to load as local file
-                const imagePath = path.join(__dirname, '../../files/TicketSystem/images', category.message.image);
+                // Nejprve zkusíme nové umístění
+                let imagePath = path.join(__dirname, '../../files/TicketSystem/images', category.message.image);
+                
+                // Pokud soubor neexistuje, zkusíme staré umístění
+                if (!fs.existsSync(imagePath)) {
+                    imagePath = path.join(__dirname, '../../files old DO NOT USE/TicketSystem/images', category.message.image);
+                }
+                
                 if (fs.existsSync(imagePath)) {
                     embed.setImage(`attachment://${category.message.image}`);
                 }
@@ -59,7 +93,14 @@ class TicketHandler {
                 embed.setThumbnail(category.message.thumbnail);
             } catch {
                 // It's not a URL, try to load as local file
-                const thumbnailPath = path.join(__dirname, '../../files/TicketSystem/images', category.message.thumbnail);
+                // Nejprve zkusíme nové umístění
+                let thumbnailPath = path.join(__dirname, '../../files/TicketSystem/images', category.message.thumbnail);
+                
+                // Pokud soubor neexistuje, zkusíme staré umístění
+                if (!fs.existsSync(thumbnailPath)) {
+                    thumbnailPath = path.join(__dirname, '../../files old DO NOT USE/TicketSystem/images', category.message.thumbnail);
+                }
+                
                 if (fs.existsSync(thumbnailPath)) {
                     embed.setThumbnail(`attachment://${category.message.thumbnail}`);
                 }
@@ -140,83 +181,213 @@ class TicketHandler {
         // Initialize rewards tracking for this channel
         this.rewardsClaimed.set(channel.id, new Set());
 
-        await interaction.update({ 
-            components: [interaction.message.components[0]]
-        });
+        // Použijeme editReply místo update, protože jsme již použili deferUpdate
+        try {
+            await interaction.editReply({ 
+                components: [interaction.message.components[0]]
+            });
+        } catch (e) {
+            console.error('Failed to update components after creating ticket:', e);
+        }
+        } catch (error) {
+            console.error('Error creating ticket:', error);
+            try {
+                await interaction.followUp({ 
+                    content: 'Nastala chyba při vytváření ticketu. Zkuste to prosím znovu.',
+                    ephemeral: true
+                });
+            } catch (replyError) {
+                console.error('Failed to send error message:', replyError);
+            }
+        }
     }
 
     static async handleTicketClose(interaction) {
-        const confirmRow = new ActionRowBuilder()
-            .addComponents(
-                new ButtonBuilder()
-                    .setCustomId('ticket_close_confirm')
-                    .setLabel('Potvrdit zavření')
-                    .setStyle(ButtonStyle.Danger),
-                new ButtonBuilder()
-                    .setCustomId('ticket_close_cancel')
-                    .setLabel('Zrušit')
-                    .setStyle(ButtonStyle.Secondary)
-            );
+        try {
+            // Ihned odložíme odpověď, abychom zabránili vypršení interakce
+            await interaction.deferReply({ ephemeral: true }).catch(e => console.error('Failed to defer reply:', e));
+            
+            const confirmRow = new ActionRowBuilder()
+                .addComponents(
+                    new ButtonBuilder()
+                        .setCustomId('ticket_close_confirm')
+                        .setLabel('Potvrdit zavření')
+                        .setStyle(ButtonStyle.Danger),
+                    new ButtonBuilder()
+                        .setCustomId('ticket_close_cancel')
+                        .setLabel('Zrušit')
+                        .setStyle(ButtonStyle.Secondary)
+                );
 
-        await interaction.reply({
-            content: 'Opravdu chcete zavřít tento ticket?',
-            components: [confirmRow],
-            ephemeral: true
-        });
+            await interaction.editReply({
+                content: 'Opravdu chcete zavřít tento ticket?',
+                components: [confirmRow],
+                ephemeral: true
+            });
+        } catch (error) {
+            console.error('Error closing ticket:', error);
+            try {
+                await interaction.editReply({
+                    content: 'Nastala chyba při zavírání ticketu.',
+                    ephemeral: true
+                });
+            } catch (e) {
+                console.error('Failed to send error message for ticket close:', e);
+            }
+        }
     }
 
     static async handleTicketCloseConfirm(interaction) {
-        this.usedResponses.delete(interaction.channel.id);
-        await interaction.channel.delete();
+        try {
+            // Ihned odložíme odpověď, abychom zabránili vypršení interakce
+            await interaction.deferUpdate().catch(e => console.error('Failed to defer update for close confirm:', e));
+            
+            this.usedResponses.delete(interaction.channel.id);
+            
+            // Pošleme zprávu, že se kanál maže
+            try {
+                await interaction.followUp({
+                    content: 'Ticket se zavírá...',
+                    ephemeral: true
+                });
+            } catch (e) {
+                console.error('Failed to send closing message:', e);
+            }
+            
+            // Počkáme 1 sekundu a pak smažeme kanál
+            setTimeout(async () => {
+                try {
+                    await interaction.channel.delete();
+                } catch (deleteError) {
+                    console.error('Error deleting channel:', deleteError);
+                }
+            }, 1000);
+        } catch (error) {
+            console.error('Error deleting ticket:', error);
+            try {
+                await interaction.followUp({
+                    content: 'Nastala chyba při mazání ticketu.',
+                    ephemeral: true
+                });
+            } catch (replyError) {
+                console.error('Failed to send error message:', replyError);
+            }
+        }
     }
 
     static async handleTicketCloseCancel(interaction) {
-        await interaction.update({
-            content: 'Zavření ticketu bylo zrušeno.',
-            components: [],
-            ephemeral: true
-        });
+        try {
+            // Ihned odložíme odpověď, abychom zabránili vypršení interakce
+            await interaction.deferUpdate().catch(e => console.error('Failed to defer update for close cancel:', e));
+            
+            await interaction.editReply({
+                content: 'Zavření ticketu bylo zrušeno.',
+                components: [],
+                ephemeral: true
+            });
+        } catch (error) {
+            console.error('Error canceling ticket close:', error);
+            try {
+                await interaction.followUp({
+                    content: 'Nastala chyba při rušení zavření ticketu.',
+                    ephemeral: true
+                });
+            } catch (replyError) {
+                console.error('Failed to send error message:', replyError);
+            }
+        }
     }
 
     static async handleTicketArchive(interaction) {
-        this.usedResponses.delete(interaction.channel.id);
-        
-        const config = JSON.parse(fs.readFileSync(path.join(__dirname, '../../files/TicketSystem/ticket-config.json'), 'utf-8'));
-        const category = config.categories.find(c => 
-            c.categoryId === interaction.channel.parent.id
-        );
-
-        if (category) {
-            await interaction.channel.setParent(category.archiveCategoryId);
-            await interaction.channel.permissionOverwrites.set([
-                {
-                    id: interaction.guild.id,
-                    deny: [PermissionsBitField.Flags.SendMessages],
-                    allow: [PermissionsBitField.Flags.ViewChannel],
-                }
-            ]);
-
-            const unarchiveRow = new ActionRowBuilder()
-                .addComponents(
-                    new ButtonBuilder()
-                        .setCustomId('ticket_unarchive')
-                        .setLabel('Odarchivovat Ticket')
-                        .setStyle(ButtonStyle.Primary)
-                );
-
-            await interaction.reply({ 
-                content: 'Ticket byl archivován.',
-                components: [unarchiveRow],
-                ephemeral: false 
+        try {
+            // Ihned odložíme odpověď, abychom zabránili vypršení interakce
+            await interaction.deferReply().catch(e => console.error('Failed to defer reply for archive:', e));
+            
+            this.usedResponses.delete(interaction.channel.id);
+            
+            // Načtení konfigurace z databáze
+            const config = await new Promise((resolve, reject) => {
+                getTicketConfig((err, config) => {
+                    if (err) reject(err);
+                    else resolve(config);
+                });
             });
+            
+            if (!config) {
+                return await interaction.reply({
+                    content: 'Nastala chyba při načítání konfigurace ticketů.',
+                    ephemeral: true
+                });
+            }
+            
+            const category = config.categories.find(c => 
+                c.categoryId === interaction.channel.parent.id
+            );
+
+            if (category) {
+                await interaction.channel.setParent(category.archiveCategoryId);
+                await interaction.channel.permissionOverwrites.set([
+                    {
+                        id: interaction.guild.id,
+                        deny: [PermissionsBitField.Flags.SendMessages],
+                        allow: [PermissionsBitField.Flags.ViewChannel],
+                    }
+                ]);
+
+                const unarchiveRow = new ActionRowBuilder()
+                    .addComponents(
+                        new ButtonBuilder()
+                            .setCustomId('ticket_unarchive')
+                            .setLabel('Odarchivovat Ticket')
+                            .setStyle(ButtonStyle.Primary)
+                    );
+
+                await interaction.editReply({ 
+                    content: 'Ticket byl archivován.',
+                    components: [unarchiveRow],
+                    ephemeral: false 
+                });
+            } else {
+                await interaction.editReply({
+                    content: 'Nelze najít kategorii pro archivaci.',
+                    ephemeral: true
+                });
+            }
+        } catch (error) {
+            console.error('Error archiving ticket:', error);
+            try {
+                await interaction.editReply({
+                    content: 'Nastala chyba při archivaci ticketu.',
+                    ephemeral: true
+                });
+            } catch (e) {
+                console.error('Failed to send error message for archive:', e);
+            }
         }
     }
 
     static async handleTicketUnarchive(interaction) {
-        const config = JSON.parse(fs.readFileSync(path.join(__dirname, '../../files/TicketSystem/ticket-config.json'), 'utf-8'));
-        const archivedCategory = config.categories.find(c => 
-            c.archiveCategoryId === interaction.channel.parent.id
-        );
+        try {
+            // Ihned odložíme odpověď, abychom zabránili vypršení interakce
+            await interaction.deferReply().catch(e => console.error('Failed to defer reply for unarchive:', e));
+            // Načtení konfigurace z databáze
+            const config = await new Promise((resolve, reject) => {
+                getTicketConfig((err, config) => {
+                    if (err) reject(err);
+                    else resolve(config);
+                });
+            });
+            
+            if (!config) {
+                return await interaction.reply({
+                    content: 'Nastala chyba při načítání konfigurace ticketů.',
+                    ephemeral: true
+                });
+            }
+            
+            const archivedCategory = config.categories.find(c => 
+                c.archiveCategoryId === interaction.channel.parent.id
+            );
 
         if (archivedCategory) {
             // Získání ID uživatele z názvu kanálu
@@ -249,28 +420,55 @@ class TicketHandler {
                 await archiveMessage.edit({ components: [] });
             }
 
-            await interaction.reply({
+            await interaction.editReply({
                 content: 'Ticket byl odarchivován.',
                 ephemeral: false
             });
         }
+        } catch (error) {
+            console.error('Error unarchiving ticket:', error);
+            try {
+                await interaction.editReply({
+                    content: 'Nastala chyba při odarchivování ticketu.',
+                    ephemeral: true
+                });
+            } catch (e) {
+                console.error('Failed to send error message for unarchive:', e);
+            }
+        }
     }
 
     static async handleTicketResponse(interaction) {
-        const config = JSON.parse(fs.readFileSync(path.join(__dirname, '../../files/TicketSystem/ticket-config.json'), 'utf-8'));
-        const categoryId = interaction.channel.parent.id;
-        const category = config.categories.find(c => c.categoryId === categoryId);
-        
-        if (!category) return;
-
-        const selectedOption = category.responseOptions.find(option => option.id === interaction.values[0]);
-        if (!selectedOption) return;
-
-        const response = new EmbedBuilder()
-            .setColor(config.embedColor)
-            .setTitle(selectedOption.label);
-
         try {
+            // Ihned odložíme odpověď, abychom zabránili vypršení interakce
+            await interaction.deferReply().catch(e => console.error('Failed to defer reply for response:', e));
+            // Načtení konfigurace z databáze
+            const config = await new Promise((resolve, reject) => {
+                getTicketConfig((err, config) => {
+                    if (err) reject(err);
+                    else resolve(config);
+                });
+            });
+            
+            if (!config) {
+                return await interaction.reply({
+                    content: 'Nastala chyba při načítání konfigurace ticketů.',
+                    ephemeral: true
+                });
+            }
+            
+            const categoryId = interaction.channel.parent.id;
+            const category = config.categories.find(c => c.categoryId === categoryId);
+            
+            if (!category) return;
+
+            const selectedOption = category.responseOptions.find(option => option.id === interaction.values[0]);
+            if (!selectedOption) return;
+
+            const response = new EmbedBuilder()
+                .setColor(config.embedColor)
+                .setTitle(selectedOption.label);
+
             // Check if this option has a money reward and prepare components first
             const components = [];
             if (selectedOption.moneyReward?.enabled) {
@@ -294,7 +492,7 @@ class TicketHandler {
                     new URL(selectedOption.content);
                     // It's a valid URL
                     response.setImage(selectedOption.content);
-                    await interaction.reply({
+                    await interaction.editReply({
                         embeds: [response],
                         components: components,
                         ephemeral: false
@@ -304,7 +502,7 @@ class TicketHandler {
                     const imagePath = path.join(__dirname, '../../files/TicketSystem/images', selectedOption.content);
                     if (fs.existsSync(imagePath)) {
                         response.setImage(`attachment://${selectedOption.content}`);
-                        await interaction.reply({
+                        await interaction.editReply({
                             embeds: [response],
                             files: [{
                                 attachment: imagePath,
@@ -316,7 +514,7 @@ class TicketHandler {
                     } else {
                         // File doesn't exist, send without image
                         response.setDescription('Obrázek nebyl nalezen.');
-                        await interaction.reply({
+                        await interaction.editReply({
                             embeds: [response],
                             components: components,
                             ephemeral: false
@@ -339,7 +537,7 @@ class TicketHandler {
                 
                 if (imageFiles.length === 0) {
                     response.setDescription('Nenalezeny žádné obrázky ve složce.');
-                    await interaction.reply({
+                    await interaction.editReply({
                         embeds: [response],
                         components: components,
                         ephemeral: false
@@ -351,7 +549,7 @@ class TicketHandler {
                     console.log('📄 Full image path:', imagePath);
                     
                     response.setDescription(`Náhodně vybraný obrázek: ${randomImage}`);
-                    await interaction.reply({ 
+                    await interaction.editReply({ 
                         embeds: [response],
                         files: [imagePath],
                         components: components,
@@ -360,7 +558,7 @@ class TicketHandler {
                 }
             } else {
                 response.setDescription(selectedOption.content);
-                await interaction.reply({
+                await interaction.editReply({
                     embeds: [response],
                     components: components,
                     ephemeral: false
@@ -420,20 +618,41 @@ class TicketHandler {
             console.error('Error processing response:', error);
             console.error('Error details:', error.message);
             console.error('Error stack:', error.stack);
-            await interaction.reply({
-                content: '❌ Chyba při zpracování odpovědi. Kontaktujte prosím administrátora.',
-                ephemeral: true
-            });
+            try {
+                await interaction.editReply({
+                    content: '❌ Chyba při zpracování odpovědi. Kontaktujte prosím administrátora.',
+                    ephemeral: true
+                });
+            } catch (e) {
+                console.error('Failed to send error message for response processing:', e);
+            }
         }
     }
 
     static async handleRewardClaim(interaction) {
         try {
+            // Ihned odložíme odpověď, abychom zabránili vypršení interakce
+            await interaction.deferUpdate().catch(e => console.error('Failed to defer update for reward claim:', e));
+            
             console.log('🎯 Starting reward claim process...');
             console.log('Full customId:', interaction.customId); // Debug log
             
-            const config = JSON.parse(fs.readFileSync(path.join(__dirname, '../../files/TicketSystem/ticket-config.json'), 'utf-8'));
-            console.log('📁 Loaded config file');
+            // Načtení konfigurace z databáze
+            const config = await new Promise((resolve, reject) => {
+                getTicketConfig((err, config) => {
+                    if (err) reject(err);
+                    else resolve(config);
+                });
+            });
+            
+            if (!config) {
+                return await interaction.reply({
+                    content: 'Nastala chyba při načítání konfigurace ticketů.',
+                    ephemeral: true
+                });
+            }
+            
+            console.log('📁 Loaded config from database');
             
             const categoryId = interaction.channel.parent.id;
             console.log('📂 Category ID:', categoryId);
@@ -474,10 +693,14 @@ class TicketHandler {
 
             if (!hasPermission) {
                 console.log('❌ Permission denied');
-                await interaction.reply({
-                    content: '❌ Nemáte oprávnění udělit tuto odměnu. Musíte být buď administrátor, nebo mít jednu z povolených rolí.',
-                    ephemeral: true
-                });
+                try {
+                    await interaction.followUp({
+                        content: '❌ Nemáte oprávnění udělit tuto odměnu. Musíte být buď administrátor, nebo mít jednu z povolených rolí.',
+                        ephemeral: true
+                    });
+                } catch (e) {
+                    console.error('Failed to send permission error message:', e);
+                }
                 return;
             }
 
@@ -491,10 +714,14 @@ class TicketHandler {
 
             if (!targetMember) {
                 console.log('❌ Target member not found');
-                await interaction.reply({
-                    content: '❌ Could not find the ticket creator.',
-                    ephemeral: true
-                });
+                try {
+                    await interaction.followUp({
+                        content: '❌ Could not find the ticket creator.',
+                        ephemeral: true
+                    });
+                } catch (e) {
+                    console.error('Failed to send target member error message:', e);
+                }
                 return;
             }
 
@@ -504,54 +731,82 @@ class TicketHandler {
             
             if (channelRewardsClaimed.has(rewardId)) {
                 console.log('❌ Reward already claimed');
-                await interaction.reply({
-                    content: '❌ This reward has already been claimed.',
-                    ephemeral: true
-                });
+                try {
+                    await interaction.followUp({
+                        content: '❌ This reward has already been claimed.',
+                        ephemeral: true
+                    });
+                } catch (e) {
+                    console.error('Failed to send already claimed error message:', e);
+                }
                 return;
             }
 
             // Find user's fraction
             console.log('🔍 Searching for user fraction...');
-            const fractionsDir = path.join(__dirname, '../../files/Fractions');
-            const fractions = fs.readdirSync(fractionsDir);
             let userFraction = null;
-            let fractionFile = null;
-
-            for (const fraction of fractions) {
-                console.log('Checking fraction:', fraction);
-                const rolePath = path.join(fractionsDir, fraction, `${fraction}.json`);
-                if (fs.existsSync(rolePath)) {
-                    const roleData = JSON.parse(fs.readFileSync(rolePath));
-                    console.log('Fraction role ID:', roleData.fractionRoleId); // Changed from roleId to fractionRoleId
-                    const role = await interaction.guild.roles.fetch(roleData.fractionRoleId); // Changed from roleId to fractionRoleId
-                    if (role && targetMember.roles.cache.has(role.id)) {
+            
+            // Projdeme role uživatele a hledáme frakci
+            for (const role of targetMember.roles.cache.values()) {
+                try {
+                    const fraction = await new Promise((resolve) => {
+                        getFractionByName(role.name, (err, fraction) => {
+                            if (err) {
+                                console.error(`Error checking fraction for role ${role.name}:`, err);
+                                resolve(null);
+                            } else {
+                                resolve(fraction);
+                            }
+                        });
+                    });
+                    
+                    if (fraction) {
                         userFraction = fraction;
-                        fractionFile = rolePath;
-                        console.log('✅ Found user fraction:', fraction);
+                        console.log('✅ Found user fraction:', fraction.name);
                         break;
                     }
+                } catch (error) {
+                    console.error(`Error checking fraction for role ${role.name}:`, error);
                 }
             }
 
-            if (!userFraction || !fractionFile) {
+            if (!userFraction) {
                 console.log('❌ User fraction not found');
-                await interaction.reply({
-                    content: '❌ Ticket creator is not in any fraction.',
-                    ephemeral: true
-                });
+                try {
+                    await interaction.followUp({
+                        content: '❌ Ticket creator is not in any fraction.',
+                        ephemeral: true
+                    });
+                } catch (e) {
+                    console.error('Failed to send fraction not found error message:', e);
+                }
                 return;
             }
 
             // Add money to fraction
             console.log('💰 Adding money to fraction...');
-            const fractionData = JSON.parse(fs.readFileSync(fractionFile));
-            const oldBalance = fractionData.money || 0;
-            fractionData.money = oldBalance + selectedOption.moneyReward.amount;
-            console.log(`Balance update: ${oldBalance} -> ${fractionData.money}`);
+            const oldBalance = userFraction.money || 0;
             
-            fs.writeFileSync(fractionFile, JSON.stringify(fractionData, null, 2));
-            console.log('✅ Money added successfully');
+            try {
+                await updateFractionMoney(userFraction.id, selectedOption.moneyReward.amount, true);
+                console.log(`Balance update: ${oldBalance} -> ${oldBalance + selectedOption.moneyReward.amount}`);
+                
+                // Aktualizujeme hodnotu peněz pro zobrazení
+                userFraction.money = oldBalance + selectedOption.moneyReward.amount;
+                
+                console.log('✅ Money added successfully');
+            } catch (error) {
+                console.error('Error updating fraction money:', error);
+                try {
+                    await interaction.followUp({
+                        content: '❌ Nastala chyba při přidávání peněz frakci.',
+                        ephemeral: true
+                    });
+                } catch (e) {
+                    console.error('Failed to send money update error message:', e);
+                }
+                return;
+            }
 
             // Mark reward as claimed
             channelRewardsClaimed.add(rewardId);
@@ -571,10 +826,10 @@ class TicketHandler {
                 const embed = new EmbedBuilder()
                     .setColor(0x00FF00)
                     .setTitle('💰 Reward Claimed')
-                    .setDescription(`${targetMember} has received ${selectedOption.moneyReward.amount}$ for their fraction ${userFraction}!`)
+                    .setDescription(`${targetMember} has received ${selectedOption.moneyReward.amount}$ for their fraction ${userFraction.name}!`)
                     .addFields({
                         name: 'New Balance',
-                        value: `${fractionData.money}$`,
+                        value: `${userFraction.money}$`,
                         inline: true
                     });
 
@@ -584,7 +839,7 @@ class TicketHandler {
                 console.error('❌ Error updating button:', buttonError);
                 // If button update fails, still try to send confirmation
                 await interaction.channel.send({ 
-                    content: `💰 ${targetMember} has received ${selectedOption.moneyReward.amount}$ for their fraction ${userFraction}!\nNew balance: ${fractionData.money}$`
+                    content: `💰 ${targetMember} has received ${selectedOption.moneyReward.amount}$ for their fraction ${userFraction.name}!\nNew balance: ${userFraction.money}$`
                 });
             }
 

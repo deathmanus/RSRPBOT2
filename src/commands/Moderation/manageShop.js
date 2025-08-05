@@ -63,31 +63,40 @@ module.exports = {
 
             case 'viewlogs':
                 const timeWindow = interaction.options.getInteger('minutes') || 60;
-                const logs = ShopLogger.getRecentLogs(timeWindow);
                 
-                if (logs.length === 0) {
-                    return await interaction.reply({
-                        content: '❌ Žádné logy nebyly nalezeny pro zadané časové období.',
-                        ephemeral: true
+                // Dočasná odpověď, protože získávání logů může trvat
+                await interaction.deferReply({ ephemeral: true });
+                
+                try {
+                    const logs = await ShopLogger.getRecentLogs(timeWindow);
+                    
+                    if (logs.length === 0) {
+                        return await interaction.editReply({
+                            content: '❌ Žádné logy nebyly nalezeny pro zadané časové období.',
+                        });
+                    }
+
+                    const embed = new EmbedBuilder()
+                        .setColor(0x00FF00)
+                        .setTitle('Logy obchodu')
+                        .setDescription(`Posledních ${timeWindow} minut`)
+                        .addFields(
+                            logs.slice(-10).map(log => ({
+                                name: `${new Date(log.timestamp).toLocaleString()} - ${log.action}`,
+                                value: '```json\n' + JSON.stringify(log.data, null, 2) + '\n```'
+                            }))
+                        )
+                        .setFooter({ text: `Zobrazeno ${Math.min(logs.length, 10)} z ${logs.length} záznamů` });
+
+                    await interaction.editReply({
+                        embeds: [embed],
+                    });
+                } catch (error) {
+                    console.error('Error fetching shop logs:', error);
+                    await interaction.editReply({
+                        content: '❌ Nastala chyba při načítání logů.',
                     });
                 }
-
-                const embed = new EmbedBuilder()
-                    .setColor(0x00FF00)
-                    .setTitle('Logy obchodu')
-                    .setDescription(`Posledních ${timeWindow} minut`)
-                    .addFields(
-                        logs.slice(-10).map(log => ({
-                            name: `${new Date(log.timestamp).toLocaleString()} - ${log.action}`,
-                            value: '```json\n' + JSON.stringify(log.data, null, 2) + '\n```'
-                        }))
-                    )
-                    .setFooter({ text: `Zobrazeno ${Math.min(logs.length, 10)} z ${logs.length} záznamů` });
-
-                await interaction.reply({
-                    embeds: [embed],
-                    ephemeral: true
-                });
                 break;
         }
     }

@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const { db, getShopItems, addShopLog, getShopLogs } = require('../Database/database');
 
 // Cache pro data obchodu
 let shopCache = {
@@ -19,6 +20,7 @@ const itemSchema = {
 
 // Logger pro obchod
 class ShopLogger {
+    // Pro zachování zpětné kompatibility
     static logFile = path.join(__dirname, '../files/logs/shop.log');
 
     static ensureLogDirectory() {
@@ -29,6 +31,11 @@ class ShopLogger {
     }
 
     static log(action, data) {
+        // Přidáme log do databáze
+        addShopLog(action, data)
+            .catch(err => console.error('Error adding shop log to database:', err));
+
+        // Pro zachování zpětné kompatibility také zapisujeme do souboru
         this.ensureLogDirectory();
         const timestamp = new Date().toISOString();
         const logEntry = {
@@ -48,19 +55,30 @@ class ShopLogger {
     }
 
     static getRecentLogs(minutes = 60) {
-        try {
-            if (!fs.existsSync(this.logFile)) return [];
-            const logs = fs.readFileSync(this.logFile, 'utf8')
-                .split('\n')
-                .filter(line => line.trim())
-                .map(line => JSON.parse(line));
+        return new Promise((resolve, reject) => {
+            getShopLogs(minutes, (err, logs) => {
+                if (err) {
+                    console.error('Error fetching shop logs from database:', err);
+                    // Záložní řešení - pokud databáze selže, zkusíme soubor
+                    try {
+                        if (!fs.existsSync(this.logFile)) return resolve([]);
+                        const fileLogs = fs.readFileSync(this.logFile, 'utf8')
+                            .split('\n')
+                            .filter(line => line.trim())
+                            .map(line => JSON.parse(line));
 
-            const timeThreshold = Date.now() - (minutes * 60 * 1000);
-            return logs.filter(log => new Date(log.timestamp) > timeThreshold);
-        } catch (error) {
-            console.error('Error reading logs:', error);
-            return [];
-        }
+                        const timeThreshold = Date.now() - (minutes * 60 * 1000);
+                        const filteredLogs = fileLogs.filter(log => new Date(log.timestamp) > timeThreshold);
+                        resolve(filteredLogs);
+                    } catch (fileErr) {
+                        console.error('Error reading logs from file:', fileErr);
+                        resolve([]);
+                    }
+                } else {
+                    resolve(logs);
+                }
+            });
+        });
     }
 }
 
@@ -75,25 +93,53 @@ class ShopSystem {
             return shopCache.sections[sectionName];
         }
 
-        const sectionPath = path.join(__dirname, '../files/Shop', sectionName);
         try {
-            const items = fs.readdirSync(sectionPath)
-                .filter(file => file.endsWith('.json'))
-                .map(file => {
-                    const itemData = JSON.parse(
-                        fs.readFileSync(path.join(sectionPath, file), 'utf8')
-                    );
-                    return {
-                        ...itemData,
-                        filename: file
-                    };
+            // Načtení položek z databáze
+            const items = await new Promise((resolve, reject) => {
+                getShopItems(sectionName, (err, rows) => {
+                    if (err) {
+                        reject(err);
+                        return;
+                    }
+                    
+                    // Zpracování dat z databáze
+                    const itemsFormatted = rows.map(item => {
+                        // Parse modifications JSON if it exists
+                        let modifications = null;
+                        if (item.modifications) {
+                            try {
+                                modifications = JSON.parse(item.modifications);
+                            } catch (e) {
+                                ShopLogger.log('Error', {
+                                    action: 'parseModifications',
+                                    itemId: item.id,
+                                    error: e.message
+                                });
+                            }
+                        }
+                        
+                        return {
+                            id: item.id,
+                            name: item.name,
+                            type: item.type,
+                            basePrice: item.base_price,
+                            maxCount: item.max_count,
+                            minCount: item.min_count,
+                            modifications: modifications,
+                            description: item.description,
+                            filename: `${item.id}.json` // Pro kompatibilitu se starým kódem
+                        };
+                    });
+                    
+                    resolve(itemsFormatted);
                 });
+            });
 
             // Aktualizace cache
             shopCache.sections[sectionName] = items;
             shopCache.lastUpdate = now;
             
-            ShopLogger.log('Section Loaded', { 
+            ShopLogger.log('Section Loaded (DB)', { 
                 section: sectionName, 
                 itemCount: items.length 
             });

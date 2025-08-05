@@ -2,12 +2,15 @@ const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const { getEmoji } = require('../../utils/emojiUtils');
 const fs = require('fs');
 const path = require('path');
+const { db, getFractionByName, updateFraction, addAuditLog } = require('../../Database/database');
 
-// Load fractions on bot start
-const fractionsDir = path.join(__dirname, '../../files/Fractions');
-const fractions = fs.readdirSync(fractionsDir, { withFileTypes: true })
-    .filter(dirent => dirent.isDirectory())
-    .map(dirent => dirent.name);
+// Load fractions from database
+let fractions = [];
+db.all(`SELECT name FROM fractions`, [], (err, rows) => {
+    if (!err && rows) {
+        fractions = rows.map(row => row.name);
+    }
+});
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -50,6 +53,16 @@ module.exports = {
 
     async execute(interaction) {
         try {
+            // Refresh fractions list before execution
+            await new Promise((resolve) => {
+                db.all(`SELECT name FROM fractions`, [], (err, rows) => {
+                    if (!err && rows) {
+                        fractions = rows.map(row => row.name);
+                    }
+                    resolve();
+                });
+            });
+            
             const fractionName = interaction.options.getString('frakce');
             const amount = interaction.options.getInteger('částka');
             const isAdding = interaction.options.getSubcommand() === 'give';
@@ -60,17 +73,22 @@ module.exports = {
                     ephemeral: true 
                 });
             }
+            
+            // Get fraction data from database
+            let fractionData;
+            await new Promise((resolve) => {
+                getFractionByName(fractionName, (err, fraction) => {
+                    fractionData = fraction;
+                    resolve();
+                });
+            });
 
-            const fractionFilePath = path.join(fractionsDir, fractionName, `${fractionName}.json`);
-
-            if (!fs.existsSync(fractionFilePath)) {
+            if (!fractionData) {
                 return await interaction.reply({ 
                     content: `${getEmoji('error')} Tato frakce neexistuje.`, 
                     ephemeral: true 
                 });
             }
-
-            let fractionData = JSON.parse(fs.readFileSync(fractionFilePath, 'utf8'));
 
             if (!isAdding && fractionData.money < amount) {
                 return await interaction.reply({ 
@@ -79,11 +97,35 @@ module.exports = {
                 });
             }
 
-            fractionData.money = isAdding ? 
-                fractionData.money + amount : 
-                fractionData.money - amount;
-
-            fs.writeFileSync(fractionFilePath, JSON.stringify(fractionData, null, 2), 'utf8');
+            const oldMoney = fractionData.money;
+            const newMoney = isAdding ? 
+                oldMoney + amount : 
+                oldMoney - amount;
+            
+            // Update fraction money in database using optimized function
+            try {
+                await updateFractionMoney(fractionData.id, amount, isAdding);
+            } catch (error) {
+                console.error('Error updating fraction money:', error);
+                return await interaction.reply({ 
+                    content: `${getEmoji('error')} Nastala chyba při aktualizaci peněz.`, 
+                    ephemeral: true 
+                });
+            }
+            
+            // Log the money change
+            addAuditLog(
+                interaction.user.id,
+                isAdding ? 'add_money' : 'remove_money',
+                'fraction',
+                fractionData.id.toString(),
+                JSON.stringify({ 
+                    fractionName: fractionData.name, 
+                    amount: amount,
+                    oldBalance: oldMoney,
+                    newBalance: newMoney
+                })
+            );
 
             const embed = new EmbedBuilder()
                 .setColor(isAdding ? 0x00FF00 : 0xFF0000)
@@ -91,7 +133,7 @@ module.exports = {
                 .setDescription(`${isAdding ? 'Frakce' : 'Frakci'} **${fractionName}** ${isAdding ? 'obdržela' : 'bylo odebráno'} **${amount} ${getEmoji('money')}**.`)
                 .addFields({ 
                     name: 'Nový zůstatek', 
-                    value: `${fractionData.money} ${getEmoji('money')}`, 
+                    value: `${newMoney} ${getEmoji('money')}`, 
                     inline: true 
                 });
 

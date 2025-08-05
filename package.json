@@ -4,7 +4,8 @@
     "discord.js": "^14.18.0",
     "dotenv": "^16.4.7",
     "node-fetch": "^2.7.0",
-    "node-schedule": "^2.1.1"
+    "node-schedule": "^2.1.1",
+    "sqlite3": "^5.1.7"
   },
   "name": "test",
   "version": "1.0.0",

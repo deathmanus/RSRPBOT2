@@ -8,28 +8,49 @@ const {
 const { getEmoji, getCategoryEmoji } = require('../../utils/emojiUtils');
 const fs = require('fs');
 const path = require('path');
+const { getFractionByName, getFractionItems } = require('../../Database/database');
 
 // Update the getInventoryDetails function
-function getInventoryDetails(dirPath) {
-    if (!fs.existsSync(dirPath)) return { count: 0, items: [] };
-    
-    const items = fs.readdirSync(dirPath)
-        .filter(file => file.endsWith('.json'))
-        .map(file => {
-            const itemData = JSON.parse(fs.readFileSync(path.join(dirPath, file)));
-            return {
-                name: itemData.name,
-                id: itemData.id,
-                count: itemData.count,
-                type: itemData.type,
-                modifications: itemData.selectedMods || []
-            };
+async function getInventoryDetails(fractionName, category) {
+    return new Promise((resolve) => {
+        getFractionItems(fractionName, (err, items) => {
+            if (err || !items || items.length === 0) {
+                resolve({ count: 0, items: [] });
+                return;
+            }
+            
+            // Filter items by category based on shop_items.type
+            const categoryItems = items.filter(item => {
+                switch (category) {
+                    case 'Air vehicles':
+                        return item.type === 'air_vehicle';
+                    case 'Ground vehicles':
+                        return item.type === 'ground_vehicle';
+                    case 'Equipment':
+                        return item.type === 'equipment';
+                    case 'Resources':
+                        return item.type === 'resource';
+                    default:
+                        return false;
+                }
+            });
+            
+            const formattedItems = categoryItems.map(item => {
+                return {
+                    name: item.name,
+                    id: item.id,
+                    count: item.count,
+                    type: item.type,
+                    modifications: item.selected_mods ? JSON.parse(item.selected_mods) : []
+                };
+            });
+            
+            resolve({
+                count: formattedItems.length,
+                items: formattedItems
+            });
         });
-
-    return {
-        count: items.length,
-        items: items
-    };
+    });
 }
 
 function getTimeDifference(dateString) {
@@ -64,6 +85,7 @@ module.exports = {
         .setDescription('Zobrazí informace o frakci'),
     async execute(interaction) {
         try {
+            const { db } = require('../../Database/database');
             await interaction.deferReply({ ephemeral: true });
 
             const userId = interaction.user.id;
@@ -73,10 +95,16 @@ module.exports = {
                 activeCollectors.get(userId).stop('new_interaction');
             }
 
-            const fractionsDir = path.join(__dirname, '../../files/Fractions');
-            const fractions = fs.readdirSync(fractionsDir, { withFileTypes: true })
-                .filter(dirent => dirent.isDirectory())
-                .map(dirent => dirent.name);
+            // Get all fractions from database
+            const fractions = [];
+            await new Promise((resolve) => {
+                db.all(`SELECT name FROM fractions`, [], (err, rows) => {
+                    if (!err && rows) {
+                        rows.forEach(row => fractions.push(row.name));
+                    }
+                    resolve();
+                });
+            });
 
             if (fractions.length === 0) {
                 return await interaction.followUp({ 
@@ -111,8 +139,25 @@ module.exports = {
             collector.on('collect', async i => {
                 try {
                     const selectedFraction = i.values[0];
-                    const fractionPath = path.join(fractionsDir, selectedFraction);
-                    const fractionData = JSON.parse(fs.readFileSync(path.join(fractionPath, `${selectedFraction}.json`)));
+                    
+                    // Get fraction data from database
+                    let fractionData;
+                    await new Promise((resolve) => {
+                        getFractionByName(selectedFraction, (err, fraction) => {
+                            fractionData = fraction;
+                            resolve();
+                        });
+                    });
+                    
+                    if (!fractionData) {
+                        await i.update({ 
+                            content: `${getEmoji('error')} Frakce nebyla nalezena v databázi.`, 
+                            embeds: [], 
+                            components: [] 
+                        });
+                        collector.stop('error');
+                        return;
+                    }
 
                     // Get guild roles and channel
                     const guild = interaction.guild;
@@ -128,8 +173,8 @@ module.exports = {
 
                     // Before creating fractionEmbed, add this code
                     const files = [];
-                    if (fractionData.logoUrl || fractionData.imageUrl) {
-                        const logoPath = path.join(fractionPath, fractionData.logoUrl || fractionData.imageUrl);
+                    if (fractionData.logoPath) {
+                        const logoPath = path.join(__dirname, '../../Database/Files/Fractions', fractionData.name, fractionData.logoPath);
                         if (fs.existsSync(logoPath)) {
                             const logoAttachment = new AttachmentBuilder(logoPath);
                             files.push(logoAttachment);
@@ -138,15 +183,15 @@ module.exports = {
 
                     const fractionEmbed = new EmbedBuilder()
                         .setColor(fractionRole ? fractionRole.hexColor : 0x00FF00)
-                        .setTitle(`${getEmoji('fraction')} ${fractionData.nazev}`);
+                        .setTitle(`${getEmoji('fraction')} ${fractionData.name}`);
 
                     // If we have a logo, set it as thumbnail
                     if (files.length > 0) {
-                        fractionEmbed.setThumbnail(`attachment://${fractionData.logoUrl || fractionData.imageUrl}`);
+                        fractionEmbed.setThumbnail(`attachment://${fractionData.logoPath}`);
                     }
 
                     // Continue with the rest of embed setup...
-                    fractionEmbed.setDescription(`>>> ${fractionData.popis || 'Žádný popis'}\n`)
+                    fractionEmbed.setDescription(`>>> ${fractionData.description || 'Žádný popis'}\n`)
                         .addFields(
                             { 
                                 name: `${getEmoji('members')} Vedení`,
@@ -179,50 +224,19 @@ module.exports = {
                         );
 
                     // Get inventory details
-                    const categories = {
-                        'Air vehicles': path.join(fractionsDir, selectedFraction, 'Air vehicles'),
-                        'Ground vehicles': path.join(fractionsDir, selectedFraction, 'Ground vehicles'),
-                        'Equipment': path.join(fractionsDir, selectedFraction, 'Equipment'),
-                        'Resources': path.join(fractionsDir, selectedFraction, 'Resources')
-                    };
-
-                    let inventoryDetails = '';
+                    const categories = ['Air vehicles', 'Ground vehicles', 'Equipment', 'Resources'];
+                    
                     let totalItems = 0;
-                    const inventoryFields = [];
-
-                    for (const [category, categoryPath] of Object.entries(categories)) {
-                        const inventory = getInventoryDetails(categoryPath);
+                    const inventoryByCategory = {};
+                    
+                    // Get inventory for each category
+                    for (const category of categories) {
+                        const inventory = await getInventoryDetails(fractionData.name, category);
                         totalItems += inventory.count;
-
-                        if (inventory.count > 0) {
-                            const itemsList = inventory.items.map(item => {
-                                let itemText = item.name;
-                                if (item.modifications && item.modifications.length > 0) {
-                                    const mods = item.modifications
-                                        .map(mod => {
-                                            let modText = mod.selected.split(':')[1];
-                                            if (mod.subSelections && Object.keys(mod.subSelections).length > 0) {
-                                                modText += ': ' + Object.entries(mod.subSelections)
-                                                    .map(([name, opt]) => `${opt.name}`)
-                                                    .join(', ');
-                                            }
-                                            return modText;
-                                        })
-                                        .join(' | ');
-                                    itemText += ` (${mods})`;
-                                }
-                                return itemText;
-                            });
-
-                            inventoryFields.push({
-                                name: `${category} (${inventory.count})`,
-                                value: itemsList.join('\n'),
-                                inline: false
-                            });
-                        }
+                        inventoryByCategory[category] = inventory;
                     }
 
-                    // Update the inventory display part in the collector's collect event
+                    // Update the inventory display part
                     if (totalItems > 0) {
                         fractionEmbed.addFields({
                             name: `${getEmoji('inventory')} Inventář`,
@@ -237,17 +251,17 @@ module.exports = {
                             'Resources': '📦'
                         };
 
-                        for (const [category, categoryPath] of Object.entries(categories)) {
-                            const inventory = getInventoryDetails(categoryPath);
+                        for (const category of categories) {
+                            const inventory = inventoryByCategory[category];
                             if (inventory.count > 0) {
                                 const formattedItems = inventory.items.map(item => {
-                                    if (item.type === 'countable') {
+                                    if (item.type === 'countable' || item.type === 'resource') {
                                         return `• ${item.name} (${item.count}x)`;
                                     }
                                     if (item.modifications && item.modifications.length > 0) {
                                         const mods = item.modifications
                                             .map(mod => {
-                                                let modText = mod.selected.split(':')[1];
+                                                let modText = mod.selected ? mod.selected.split(':')[1] : '';
                                                 if (mod.subSelections && Object.keys(mod.subSelections).length > 0) {
                                                     modText += ': ' + Object.entries(mod.subSelections)
                                                         .map(([name, opt]) => `${opt.name}`)
@@ -255,15 +269,16 @@ module.exports = {
                                                 }
                                                 return modText;
                                             })
+                                            .filter(mod => mod) // Filter out empty mods
                                             .join(' | ');
-                                        return `• ${item.name} (${mods})`;
+                                        return `• ${item.name}${mods ? ` (${mods})` : ''}`;
                                     }
                                     return `• ${item.name}`;
                                 }).join('\n');
 
                                 const categoryKey = category.toLowerCase().replace(' ', '_');
                                 fractionEmbed.addFields({
-                                    name: `${getCategoryEmoji(categoryKey)} ${category} (${inventory.count})`,
+                                    name: `${getCategoryEmoji(categoryKey) || categoryEmojis[category]} ${category} (${inventory.count})`,
                                     value: `\n${formattedItems}\n`,
                                     inline: false
                                 });
@@ -279,7 +294,7 @@ module.exports = {
 
                     // Add footer with fraction ID
                     fractionEmbed.setFooter({ 
-                        text: `ID Frakce: ${selectedFraction}` 
+                        text: `ID Frakce: ${fractionData.id}` 
                     });
 
                     // Add timestamp

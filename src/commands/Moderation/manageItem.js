@@ -1,6 +1,7 @@
 const { SlashCommandBuilder, ActionRowBuilder, StringSelectMenuBuilder, EmbedBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const fs = require('fs');
 const path = require('path');
+const { db, getFractionByName, getFractionItems, addFractionItem, deleteFractionItem, addAuditLog } = require('../../Database/database');
 
 function createModificationPages(modifications, selectedMods) {
     const allRows = [];
@@ -187,12 +188,18 @@ module.exports = {
         try {
             await interaction.deferReply({ ephemeral: true }).catch(console.error);
 
-            const fractionsDir = path.join(__dirname, '../../files/Fractions');
             const shopDir = path.join(__dirname, '../../files/Shop');
             
-            const fractions = fs.readdirSync(fractionsDir, { withFileTypes: true })
-                .filter(dirent => dirent.isDirectory())
-                .map(dirent => dirent.name);
+            // Načtení všech frakcí z databáze
+            const fractions = [];
+            await new Promise((resolve) => {
+                db.all(`SELECT name FROM fractions ORDER BY name`, [], (err, rows) => {
+                    if (!err && rows) {
+                        rows.forEach(row => fractions.push(row.name));
+                    }
+                    resolve();
+                });
+            });
 
             if (fractions.length === 0) {
                 return await interaction.editReply({ content: '❌ Žádné frakce nenalezeny.' });
@@ -203,6 +210,7 @@ module.exports = {
             let selectedItem = null;
             let selectedMods = [];
             let currentPage = 0;
+            let itemState = { type: null, selectedCount: 1 };
 
             const fractionMenu = new StringSelectMenuBuilder()
                 .setCustomId('select-fraction')
@@ -233,122 +241,335 @@ module.exports = {
 
                     if (i.customId === 'select-fraction') {
                         selectedFraction = i.values[0];
-                        const selectionsPath = isGiving ? shopDir : path.join(fractionsDir, selectedFraction);
                         
-                        try {
-                            const sections = fs.readdirSync(selectionsPath, { withFileTypes: true })
-                                .filter(dirent => dirent.isDirectory())
-                                .map(dirent => dirent.name);
+                        if (isGiving) {
+                            // Pro přidání položky načítáme sekce ze shopDir
+                            try {
+                                const sections = fs.readdirSync(shopDir, { withFileTypes: true })
+                                    .filter(dirent => dirent.isDirectory())
+                                    .map(dirent => dirent.name);
 
-                            if (!isGiving && sections.length === 0) {
+                                const sectionMenu = new StringSelectMenuBuilder()
+                                    .setCustomId('select-section')
+                                    .setPlaceholder('Vyberte sekci')
+                                    .addOptions(sections.map(section => ({
+                                        label: section,
+                                        value: section
+                                    })));
+
+                                const fractionMenuUpdated = new StringSelectMenuBuilder()
+                                    .setCustomId('select-fraction')
+                                    .setPlaceholder('Vyberte frakci')
+                                    .addOptions(fractions.map(fraction => ({
+                                        label: fraction,
+                                        value: fraction,
+                                        default: fraction === selectedFraction
+                                    })));
+
                                 await i.editReply({
-                                    content: '❌ Tato frakce nemá žádné itemy.',
+                                    embeds: [embed.setDescription(`Vyberte sekci pro frakci ${selectedFraction}`)],
+                                    components: [
+                                        new ActionRowBuilder().addComponents(fractionMenuUpdated),
+                                        new ActionRowBuilder().addComponents(sectionMenu)
+                                    ]
+                                });
+                            } catch (error) {
+                                console.error(`Error accessing shop directory`, error);
+                                await i.editReply({
+                                    content: '❌ Nastala chyba při načítání sekcí ze shopu.',
                                     components: []
                                 });
-                                return collector.stop();
+                                collector.stop();
                             }
+                        } else {
+                            // Pro odebrání položky načítáme sekce z databáze
+                            try {
+                                // Nejprve získáme ID frakce
+                                let fractionId = null;
+                                await new Promise((resolve) => {
+                                    getFractionByName(selectedFraction, (err, fraction) => {
+                                        if (!err && fraction) {
+                                            fractionId = fraction.id;
+                                        }
+                                        resolve();
+                                    });
+                                });
+                                
+                                if (!fractionId) {
+                                    await i.editReply({
+                                        content: '❌ Frakce nebyla nalezena v databázi.',
+                                        components: []
+                                    });
+                                    return collector.stop();
+                                }
+                                
+                                // Získáme typy sekcí z itemů frakce
+                                const sectionTypes = new Set();
+                                await new Promise((resolve) => {
+                                    db.all(
+                                        `SELECT DISTINCT shop_items.type 
+                                         FROM purchases 
+                                         JOIN shop_items ON purchases.item_id = shop_items.id 
+                                         WHERE purchases.fraction_id = ?`,
+                                        [fractionId],
+                                        (err, rows) => {
+                                            if (!err && rows) {
+                                                rows.forEach(row => {
+                                                    let section = 'Other';
+                                                    if (row.type === 'air_vehicle') section = 'Air vehicles';
+                                                    else if (row.type === 'ground_vehicle') section = 'Ground vehicles';
+                                                    else if (row.type === 'equipment') section = 'Equipment';
+                                                    else if (row.type === 'resource') section = 'Resources';
+                                                    
+                                                    sectionTypes.add(section);
+                                                });
+                                            }
+                                            resolve();
+                                        }
+                                    );
+                                });
+                                
+                                const sections = Array.from(sectionTypes);
+                                
+                                if (sections.length === 0) {
+                                    await i.editReply({
+                                        content: '❌ Tato frakce nemá žádné itemy.',
+                                        components: []
+                                    });
+                                    return collector.stop();
+                                }
 
-                            const sectionMenu = new StringSelectMenuBuilder()
-                                .setCustomId('select-section')
-                                .setPlaceholder('Vyberte sekci')
-                                .addOptions(sections.map(section => ({
-                                    label: section,
-                                    value: section
-                                })));
+                                const sectionMenu = new StringSelectMenuBuilder()
+                                    .setCustomId('select-section')
+                                    .setPlaceholder('Vyberte sekci')
+                                    .addOptions(sections.map(section => ({
+                                        label: section,
+                                        value: section
+                                    })));
 
-                            const fractionMenuUpdated = new StringSelectMenuBuilder()
-                                .setCustomId('select-fraction')
-                                .setPlaceholder('Vyberte frakci')
-                                .addOptions(fractions.map(fraction => ({
-                                    label: fraction,
-                                    value: fraction,
-                                    default: fraction === selectedFraction
-                                })));
+                                const fractionMenuUpdated = new StringSelectMenuBuilder()
+                                    .setCustomId('select-fraction')
+                                    .setPlaceholder('Vyberte frakci')
+                                    .addOptions(fractions.map(fraction => ({
+                                        label: fraction,
+                                        value: fraction,
+                                        default: fraction === selectedFraction
+                                    })));
 
-                            await i.editReply({
-                                embeds: [embed.setDescription(`Vyberte sekci pro frakci ${selectedFraction}`)],
-                                components: [
-                                    new ActionRowBuilder().addComponents(fractionMenuUpdated),
-                                    new ActionRowBuilder().addComponents(sectionMenu)
-                                ]
-                            });
-                        } catch (error) {
-                            console.error(`Error accessing directory: ${selectionsPath}`, error);
-                            await i.editReply({
-                                content: '❌ Nastala chyba při načítání sekcí.',
-                                components: []
-                            });
-                            collector.stop();
+                                await i.editReply({
+                                    embeds: [embed.setDescription(`Vyberte sekci pro frakci ${selectedFraction}`)],
+                                    components: [
+                                        new ActionRowBuilder().addComponents(fractionMenuUpdated),
+                                        new ActionRowBuilder().addComponents(sectionMenu)
+                                    ]
+                                });
+                            } catch (error) {
+                                console.error(`Error accessing fraction items`, error);
+                                await i.editReply({
+                                    content: '❌ Nastala chyba při načítání sekcí frakce.',
+                                    components: []
+                                });
+                                collector.stop();
+                            }
                         }
                     }
 
-                    // In the else if (i.customId === 'select-section') block for take items
                     else if (i.customId === 'select-section') {
                         selectedSection = i.values[0];
-                        const itemsPath = isGiving ? 
-                            path.join(shopDir, selectedSection) :
-                            path.join(fractionsDir, selectedFraction, selectedSection);
+                        
+                        if (isGiving) {
+                            // Pro přidání položky načítáme itemy ze shop adresáře
+                            const itemsPath = path.join(shopDir, selectedSection);
+                            try {
+                                const items = fs.readdirSync(itemsPath)
+                                    .filter(file => file.endsWith('.json'))
+                                    .map(file => {
+                                        const itemData = JSON.parse(fs.readFileSync(path.join(itemsPath, file)));
+                                        return {
+                                            label: itemData.name || file.replace('.json', ''),
+                                            value: file.replace('.json', ''),
+                                            description: itemData.description?.substring(0, 100) || undefined
+                                        };
+                                    });
 
-                        try {
-                            const items = fs.readdirSync(itemsPath)
-                                .filter(file => file.endsWith('.json'))
-                                .map(file => {
-                                    const itemData = JSON.parse(fs.readFileSync(path.join(itemsPath, file)));
-                                    return isGiving ? {
-                                        label: itemData.name || file.replace('.json', ''),
-                                        value: file.replace('.json', ''),
-                                        description: itemData.description?.substring(0, 100) || undefined
-                                    } : {
-                                        label: `${itemData.name} (ID: ${itemData.id})`,
-                                        value: file
-                                    };
+                                const itemMenu = new StringSelectMenuBuilder()
+                                    .setCustomId('select-item')
+                                    .setPlaceholder('Vyberte item')
+                                    .addOptions(items);
+
+                                const sectionMenuUpdated = new StringSelectMenuBuilder()
+                                    .setCustomId('select-section')
+                                    .setPlaceholder('Vyberte sekci')
+                                    .addOptions(fs.readdirSync(shopDir, { withFileTypes: true })
+                                        .filter(dirent => dirent.isDirectory())
+                                        .map(dirent => ({
+                                            label: dirent.name,
+                                            value: dirent.name,
+                                            default: dirent.name === selectedSection
+                                        })));
+
+                                await i.editReply({
+                                    embeds: [embed.setDescription(`Vyberte item pro frakci ${selectedFraction}`)],
+                                    components: [
+                                        new ActionRowBuilder().addComponents(sectionMenuUpdated),
+                                        new ActionRowBuilder().addComponents(itemMenu)
+                                    ]
                                 });
-
-                            if (!isGiving && items.length === 0) {
-                                return await i.editReply({
-                                    content: '❌ Tato sekce neobsahuje žádné itemy.',
+                            } catch (error) {
+                                console.error(`Error accessing items in: ${itemsPath}`, error);
+                                await i.editReply({
+                                    content: '❌ Nastala chyba při načítání itemů.',
                                     components: []
                                 });
+                                collector.stop();
                             }
+                        } else {
+                            // Pro odebrání položky načítáme itemy z databáze
+                            try {
+                                // Získáme ID frakce
+                                let fractionId = null;
+                                await new Promise((resolve) => {
+                                    getFractionByName(selectedFraction, (err, fraction) => {
+                                        if (!err && fraction) {
+                                            fractionId = fraction.id;
+                                        }
+                                        resolve();
+                                    });
+                                });
+                                
+                                if (!fractionId) {
+                                    await i.editReply({
+                                        content: '❌ Frakce nebyla nalezena v databázi.',
+                                        components: []
+                                    });
+                                    return collector.stop();
+                                }
+                                
+                                // Získáme položky frakce podle typu sekce
+                                let itemType = '';
+                                if (selectedSection === 'Air vehicles') itemType = 'air_vehicle';
+                                else if (selectedSection === 'Ground vehicles') itemType = 'ground_vehicle';
+                                else if (selectedSection === 'Equipment') itemType = 'equipment';
+                                else if (selectedSection === 'Resources') itemType = 'resource';
+                                
+                                const items = [];
+                                await new Promise((resolve) => {
+                                    db.all(
+                                        `SELECT purchases.id, purchases.count, shop_items.name, shop_items.type
+                                         FROM purchases 
+                                         JOIN shop_items ON purchases.item_id = shop_items.id 
+                                         WHERE purchases.fraction_id = ? AND shop_items.type = ?`,
+                                        [fractionId, itemType],
+                                        (err, rows) => {
+                                            if (!err && rows) {
+                                                rows.forEach(row => {
+                                                    items.push({
+                                                        label: `${row.name} (ID: ${row.id})`,
+                                                        value: row.id.toString(),
+                                                        description: row.count ? `Množství: ${row.count}` : undefined
+                                                    });
+                                                });
+                                            }
+                                            resolve();
+                                        }
+                                    );
+                                });
+                                
+                                if (items.length === 0) {
+                                    return await i.editReply({
+                                        content: '❌ Tato sekce neobsahuje žádné itemy.',
+                                        components: []
+                                    });
+                                }
+                                
+                                const itemMenu = new StringSelectMenuBuilder()
+                                    .setCustomId('select-item')
+                                    .setPlaceholder('Vyberte item')
+                                    .addOptions(items);
 
-                            const itemMenu = new StringSelectMenuBuilder()
-                                .setCustomId('select-item')
-                                .setPlaceholder('Vyberte item')
-                                .addOptions(items);
-
-                            const sectionMenuUpdated = new StringSelectMenuBuilder()
-                                .setCustomId('select-section')
-                                .setPlaceholder('Vyberte sekci')
-                                .addOptions(fs.readdirSync(isGiving ? shopDir : path.join(fractionsDir, selectedFraction), { withFileTypes: true })
-                                    .filter(dirent => dirent.isDirectory())
-                                    .map(dirent => ({
-                                        label: dirent.name,
-                                        value: dirent.name,
-                                        default: dirent.name === selectedSection
+                                // Získáme dostupné sekce pro aktualizaci menu
+                                const sectionTypes = new Set();
+                                await new Promise((resolve) => {
+                                    db.all(
+                                        `SELECT DISTINCT shop_items.type 
+                                         FROM purchases 
+                                         JOIN shop_items ON purchases.item_id = shop_items.id 
+                                         WHERE purchases.fraction_id = ?`,
+                                        [fractionId],
+                                        (err, rows) => {
+                                            if (!err && rows) {
+                                                rows.forEach(row => {
+                                                    let section = 'Other';
+                                                    if (row.type === 'air_vehicle') section = 'Air vehicles';
+                                                    else if (row.type === 'ground_vehicle') section = 'Ground vehicles';
+                                                    else if (row.type === 'equipment') section = 'Equipment';
+                                                    else if (row.type === 'resource') section = 'Resources';
+                                                    
+                                                    sectionTypes.add(section);
+                                                });
+                                            }
+                                            resolve();
+                                        }
+                                    );
+                                });
+                                
+                                const sections = Array.from(sectionTypes);
+                                
+                                const sectionMenuUpdated = new StringSelectMenuBuilder()
+                                    .setCustomId('select-section')
+                                    .setPlaceholder('Vyberte sekci')
+                                    .addOptions(sections.map(section => ({
+                                        label: section,
+                                        value: section,
+                                        default: section === selectedSection
                                     })));
 
-                            await i.editReply({
-                                embeds: [embed.setDescription(`Vyberte item ${isGiving ? 'pro' : 'k odebrání z'} frakce ${selectedFraction}`)],
-                                components: [
-                                    new ActionRowBuilder().addComponents(sectionMenuUpdated),
-                                    new ActionRowBuilder().addComponents(itemMenu)
-                                ]
-                            });
-                        } catch (error) {
-                            console.error(`Error accessing items in: ${itemsPath}`, error);
-                            await i.editReply({
-                                content: '❌ Nastala chyba při načítání itemů.',
-                                components: []
-                            });
-                            collector.stop();
+                                await i.editReply({
+                                    embeds: [embed.setDescription(`Vyberte item k odebrání z frakce ${selectedFraction}`)],
+                                    components: [
+                                        new ActionRowBuilder().addComponents(sectionMenuUpdated),
+                                        new ActionRowBuilder().addComponents(itemMenu)
+                                    ]
+                                });
+                            } catch (error) {
+                                console.error(`Error accessing items for fraction`, error);
+                                await i.editReply({
+                                    content: '❌ Nastala chyba při načítání itemů.',
+                                    components: []
+                                });
+                                collector.stop();
+                            }
                         }
                     }
 
                     // And modify the select-item handler for take functionality
                     else if (i.customId === 'select-item' && !isGiving) {
                         selectedItem = i.values[0];
-                        const itemPath = path.join(fractionsDir, selectedFraction, selectedSection, selectedItem);
-                        const itemData = JSON.parse(fs.readFileSync(itemPath));
+                        
+                        // Získáme data položky z databáze
+                        let itemData = null;
+                        await new Promise((resolve) => {
+                            db.get(
+                                `SELECT purchases.*, shop_items.name, shop_items.type 
+                                 FROM purchases 
+                                 JOIN shop_items ON purchases.item_id = shop_items.id 
+                                 WHERE purchases.id = ?`,
+                                [selectedItem],
+                                (err, row) => {
+                                    if (!err && row) {
+                                        itemData = row;
+                                    }
+                                    resolve();
+                                }
+                            );
+                        });
+                        
+                        if (!itemData) {
+                            return await i.editReply({
+                                content: '❌ Položka nebyla nalezena v databázi.',
+                                components: []
+                            });
+                        }
 
                         const confirmationEmbed = new EmbedBuilder()
                             .setColor(0xFF0000)
@@ -358,6 +579,14 @@ module.exports = {
                                 { name: 'Frakce', value: selectedFraction, inline: true },
                                 { name: 'Sekce', value: selectedSection, inline: true }
                             );
+                        
+                        if (itemData.count && itemData.count > 1) {
+                            confirmationEmbed.addFields({ 
+                                name: 'Množství', 
+                                value: `${itemData.count}x`, 
+                                inline: true 
+                            });
+                        }
 
                         const confirmButton = new ButtonBuilder()
                             .setCustomId('confirm-action')
@@ -376,48 +605,76 @@ module.exports = {
                     }
 
                     // Modify the select-item handler
-                    else if (i.customId === 'select-item') {
+                    else if (i.customId === 'select-item' && isGiving) {
                         selectedItem = i.values[0];
                         const itemPath = path.join(shopDir, selectedSection, `${selectedItem}.json`);
                         const itemData = JSON.parse(fs.readFileSync(itemPath, 'utf8'));
                     
-                        if (isGiving) {
-                            if (itemData.type === 'countable') {
-                                itemState = { type: 'countable', selectedCount: 1 };
-                                const display = createCountableDisplay(itemData, 1, isGiving);
-                                await i.editReply({
-                                    embeds: [display.embed],
-                                    components: display.components
+                        if (itemData.type === 'countable') {
+                            itemState = { type: 'countable', selectedCount: 1 };
+                            const display = createCountableDisplay(itemData, 1, isGiving);
+                            await i.editReply({
+                                embeds: [display.embed],
+                                components: display.components
+                            });
+                        } else if (itemData.modifications) {
+                            // Initialize selectedMods with proper default selections
+                            selectedMods = Object.entries(itemData.modifications).map(([modName, modValues]) => {
+                                const defaultOption = modValues[0]; // Get first option as default
+                                const mod = {
+                                    modName,
+                                    selected: `${modName}:${defaultOption.name}:${defaultOption.price || 0}`,
+                                    subSelections: {}
+                                };
+                
+                                // Initialize sub-selections if they exist
+                                if (defaultOption.subOptions) {
+                                    Object.entries(defaultOption.subOptions).forEach(([subName, subValues]) => {
+                                        if (Array.isArray(subValues) && subValues.length > 0) {
+                                            mod.subSelections[subName] = {
+                                                name: subValues[0].name,
+                                                price: subValues[0].price || 0
+                                            };
+                                        }
+                                    });
+                                }
+                
+                                return mod;
+                            });
+                
+                            currentPage = 0;
+                            const display = updateModificationDisplay(itemData, selectedMods, currentPage);
+                            await i.editReply(display);
+                        } else {
+                            // Základní položka bez modifikací
+                            itemState = { type: 'basic', selectedCount: 1 };
+                            
+                            const confirmButton = new ButtonBuilder()
+                                .setCustomId('confirm-action')
+                                .setLabel('Přidat')
+                                .setStyle(ButtonStyle.Success);
+                            
+                            const cancelButton = new ButtonBuilder()
+                                .setCustomId('cancel-action')
+                                .setLabel('Zrušit')
+                                .setStyle(ButtonStyle.Secondary);
+                            
+                            const basicEmbed = new EmbedBuilder()
+                                .setColor(0x00FF00)
+                                .setTitle(itemData.name)
+                                .setDescription(`Chcete přidat tento předmět do frakce ${selectedFraction}?`);
+                                
+                            if (itemData.description) {
+                                basicEmbed.addFields({ 
+                                    name: 'Popis', 
+                                    value: itemData.description.substring(0, 1024)
                                 });
-                            } else if (itemData.modifications) {
-                                // Initialize selectedMods with proper default selections
-                                selectedMods = Object.entries(itemData.modifications).map(([modName, modValues]) => {
-                                    const defaultOption = modValues[0]; // Get first option as default
-                                    const mod = {
-                                        modName,
-                                        selected: `${modName}:${defaultOption.name}:${defaultOption.price || 0}`,
-                                        subSelections: {}
-                                    };
-                    
-                                    // Initialize sub-selections if they exist
-                                    if (defaultOption.subOptions) {
-                                        Object.entries(defaultOption.subOptions).forEach(([subName, subValues]) => {
-                                            if (Array.isArray(subValues) && subValues.length > 0) {
-                                                mod.subSelections[subName] = {
-                                                    name: subValues[0].name,
-                                                    price: subValues[0].price || 0
-                                                };
-                                            }
-                                        });
-                                    }
-                    
-                                    return mod;
-                                });
-                    
-                                currentPage = 0;
-                                const display = updateModificationDisplay(itemData, selectedMods, currentPage);
-                                await i.editReply(display);
                             }
+                            
+                            await i.editReply({
+                                embeds: [basicEmbed],
+                                components: [new ActionRowBuilder().addComponents(confirmButton, cancelButton)]
+                            });
                         }
                     }
 
@@ -519,40 +776,96 @@ module.exports = {
                     else if (i.customId === 'confirm-action') {
                         try {
                             if (isGiving) {
+                                // Přidání položky do frakce
                                 const sourcePath = path.join(shopDir, selectedSection, `${selectedItem}.json`);
-                                const targetDir = path.join(fractionsDir, selectedFraction, selectedSection);
-                                fs.mkdirSync(targetDir, { recursive: true });
-                    
                                 const itemData = JSON.parse(fs.readFileSync(sourcePath, 'utf8'));
-                    
-                                // In the confirm-action handler, modify the countable item section
-                                if (itemData.type === 'countable') {
-                                    const existingFiles = fs.readdirSync(targetDir)
-                                        .filter(file => file.endsWith('.json'));
-                                    
-                                    let existingItem = null;
-                                    let existingItemPath = null;
                                 
-                                    // Find existing item with the same name and basePrice
-                                    for (const file of existingFiles) {
-                                        const checkPath = path.join(targetDir, file);
-                                        const checkItem = JSON.parse(fs.readFileSync(checkPath));
-                                        
-                                        // Compare both name and basePrice to ensure it's the exact same item type
-                                        if (checkItem.name === itemData.name && 
-                                            checkItem.type === 'countable' && 
-                                            checkItem.basePrice === itemData.basePrice) {
-                                            existingItem = checkItem;
-                                            existingItemPath = checkPath;
-                                            break;
+                                // Získáme ID frakce
+                                let fractionId = null;
+                                await new Promise((resolve) => {
+                                    getFractionByName(selectedFraction, (err, fraction) => {
+                                        if (!err && fraction) {
+                                            fractionId = fraction.id;
                                         }
-                                    }
+                                        resolve();
+                                    });
+                                });
                                 
+                                if (!fractionId) {
+                                    await i.editReply({
+                                        content: '❌ Frakce nebyla nalezena v databázi.',
+                                        components: []
+                                    });
+                                    return collector.stop();
+                                }
+                                
+                                // Získáme ID shop itemu
+                                let shopItemId = null;
+                                await new Promise((resolve) => {
+                                    db.get(
+                                        `SELECT id FROM shop_items WHERE name = ?`,
+                                        [itemData.name],
+                                        (err, row) => {
+                                            if (!err && row) {
+                                                shopItemId = row.id;
+                                            }
+                                            resolve();
+                                        }
+                                    );
+                                });
+                                
+                                if (!shopItemId) {
+                                    await i.editReply({
+                                        content: '❌ Položka nebyla nalezena v databázi shopu.',
+                                        components: []
+                                    });
+                                    return collector.stop();
+                                }
+                                
+                                if (itemData.type === 'countable') {
+                                    // Countable item - zkontrolujeme, zda už frakce tuto položku má
+                                    let existingItem = null;
+                                    await new Promise((resolve) => {
+                                        db.get(
+                                            `SELECT * FROM purchases WHERE fraction_id = ? AND item_id = ?`,
+                                            [fractionId, shopItemId],
+                                            (err, row) => {
+                                                if (!err && row) {
+                                                    existingItem = row;
+                                                }
+                                                resolve();
+                                            }
+                                        );
+                                    });
+                                    
                                     if (existingItem) {
-                                        // Update existing item
-                                        existingItem.count += itemState.selectedCount;
-                                        fs.writeFileSync(existingItemPath, JSON.stringify(existingItem, null, 2));
-                                
+                                        // Aktualizujeme existující položku
+                                        const newCount = existingItem.count + itemState.selectedCount;
+                                        await new Promise((resolve, reject) => {
+                                            db.run(
+                                                `UPDATE purchases SET count = ? WHERE id = ?`,
+                                                [newCount, existingItem.id],
+                                                function(err) {
+                                                    if (err) reject(err);
+                                                    else resolve();
+                                                }
+                                            );
+                                        });
+                                        
+                                        // Přidáme audit log
+                                        addAuditLog(
+                                            interaction.user.id,
+                                            'update_item',
+                                            'purchase',
+                                            existingItem.id.toString(),
+                                            JSON.stringify({
+                                                fractionName: selectedFraction,
+                                                itemName: itemData.name,
+                                                addedCount: itemState.selectedCount,
+                                                newCount: newCount
+                                            })
+                                        );
+                                        
                                         const resultEmbed = new EmbedBuilder()
                                             .setColor(0x00FF00)
                                             .setTitle('✅ Item aktualizován')
@@ -560,30 +873,55 @@ module.exports = {
                                             .addFields(
                                                 { name: 'Item', value: itemData.name, inline: true },
                                                 { name: 'Přidáno', value: `${itemState.selectedCount}x`, inline: true },
-                                                { name: 'Nové množství', value: `${existingItem.count}x`, inline: true },
-                                                { name: 'ID', value: existingItem.id, inline: true }
+                                                { name: 'Nové množství', value: `${newCount}x`, inline: true },
+                                                { name: 'ID', value: existingItem.id.toString(), inline: true }
                                             );
-                                
+                                        
                                         await i.editReply({
                                             content: null,
                                             embeds: [resultEmbed],
                                             components: []
                                         });
                                     } else {
-                                        // Create new item
-                                        const newItemData = {
-                                            ...itemData,
-                                            id: `${selectedItem}_${Date.now()}`,
-                                            addedBy: interaction.user.tag,
-                                            addedDate: new Date().toISOString(),
-                                            count: itemState.selectedCount
-                                        };
-                    
-                                        fs.writeFileSync(
-                                            path.join(targetDir, `${newItemData.id}.json`),
-                                            JSON.stringify(newItemData, null, 2)
+                                        // Vytvoříme novou položku
+                                        let newItemId = null;
+                                        await new Promise((resolve, reject) => {
+                                            db.run(
+                                                `INSERT INTO purchases 
+                                                 (fraction_id, item_id, count, selected_mods, total_price, purchase_date, buyer)
+                                                 VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                                                [
+                                                    fractionId,
+                                                    shopItemId,
+                                                    itemState.selectedCount,
+                                                    null, // Countable itemy nemají modifikace
+                                                    0,    // Cena je 0, protože je to admin přidání
+                                                    new Date().toISOString(),
+                                                    interaction.user.tag
+                                                ],
+                                                function(err) {
+                                                    if (err) reject(err);
+                                                    else {
+                                                        newItemId = this.lastID;
+                                                        resolve();
+                                                    }
+                                                }
+                                            );
+                                        });
+                                        
+                                        // Přidáme audit log
+                                        addAuditLog(
+                                            interaction.user.id,
+                                            'add_item',
+                                            'purchase',
+                                            newItemId.toString(),
+                                            JSON.stringify({
+                                                fractionName: selectedFraction,
+                                                itemName: itemData.name,
+                                                count: itemState.selectedCount
+                                            })
                                         );
-                    
+                                        
                                         const resultEmbed = new EmbedBuilder()
                                             .setColor(0x00FF00)
                                             .setTitle('✅ Item přidán')
@@ -591,9 +929,9 @@ module.exports = {
                                             .addFields(
                                                 { name: 'Item', value: itemData.name, inline: true },
                                                 { name: 'Množství', value: `${itemState.selectedCount}x`, inline: true },
-                                                { name: 'ID', value: newItemData.id, inline: true }
+                                                { name: 'ID', value: newItemId.toString(), inline: true }
                                             );
-                    
+                                        
                                         await i.editReply({
                                             content: null,
                                             embeds: [resultEmbed],
@@ -601,53 +939,148 @@ module.exports = {
                                         });
                                     }
                                 } else {
-                                    // Existing modifiable item handling...
-                                    const newItemData = {
-                                        ...itemData,
-                                        id: `${selectedItem}_${Date.now()}`,
-                                        addedBy: interaction.user.tag,
-                                        addedDate: new Date().toISOString(),
-                                        selectedMods
-                                    };
-                    
-                                    // Rest of the modifiable item code...
-                                }
-                            } else {
-                                // Remove the .json extension since it's already in the selectedItem
-                                const itemPath = path.join(fractionsDir, selectedFraction, selectedSection, selectedItem);
-                                try {
-                                    const itemData = JSON.parse(fs.readFileSync(itemPath, 'utf8'));
+                                    // Nekountovatelný item s modifikacemi
+                                    let newItemId = null;
+                                    await new Promise((resolve, reject) => {
+                                        db.run(
+                                            `INSERT INTO purchases 
+                                             (fraction_id, item_id, count, selected_mods, total_price, purchase_date, buyer)
+                                             VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                                            [
+                                                fractionId,
+                                                shopItemId,
+                                                1, // Vždy 1 pro nekountovatelné
+                                                JSON.stringify(selectedMods),
+                                                0, // Cena je 0, protože je to admin přidání
+                                                new Date().toISOString(),
+                                                interaction.user.tag
+                                            ],
+                                            function(err) {
+                                                if (err) reject(err);
+                                                else {
+                                                    newItemId = this.lastID;
+                                                    resolve();
+                                                }
+                                            }
+                                        );
+                                    });
+                                    
+                                    // Přidáme audit log
+                                    addAuditLog(
+                                        interaction.user.id,
+                                        'add_item',
+                                        'purchase',
+                                        newItemId.toString(),
+                                        JSON.stringify({
+                                            fractionName: selectedFraction,
+                                            itemName: itemData.name,
+                                            modifications: selectedMods
+                                        })
+                                    );
                                     
                                     const resultEmbed = new EmbedBuilder()
-                                        .setColor(0xFF0000)
-                                        .setTitle('✅ Item odebrán')
-                                        .setDescription(`Item byl úspěšně odebrán z frakce ${selectedFraction}`)
+                                        .setColor(0x00FF00)
+                                        .setTitle('✅ Item přidán')
+                                        .setDescription(`Item byl úspěšně přidán do frakce ${selectedFraction}`)
                                         .addFields(
                                             { name: 'Item', value: itemData.name, inline: true },
-                                            { name: 'Sekce', value: selectedSection, inline: true }
+                                            { name: 'ID', value: newItemId.toString(), inline: true }
                                         );
-                                
-                                    fs.unlinkSync(itemPath);
-                                
-                                    // Check if section is empty and remove if it is
-                                    const sectionPath = path.join(fractionsDir, selectedFraction, selectedSection);
-                                    const remainingFiles = fs.readdirSync(sectionPath).filter(f => f.endsWith('.json'));
-                                    if (remainingFiles.length === 0) {
-                                        fs.rmdirSync(sectionPath);
+                                    
+                                    // Přidáme modifikace do výsledného embedu
+                                    if (selectedMods.length > 0) {
+                                        selectedMods.forEach(mod => {
+                                            const modValue = `${mod.selected.split(':')[1]}${
+                                                mod.subSelections && Object.keys(mod.subSelections).length > 0 ?
+                                                    '\n' + Object.entries(mod.subSelections)
+                                                        .map(([name, opt]) => `${name}: ${opt.name}`).join('\n') 
+                                                    : ''
+                                            }`;
+                                            
+                                            resultEmbed.addFields({ name: mod.modName, value: modValue, inline: true });
+                                        });
                                     }
-                                
+                                    
                                     await i.editReply({
                                         content: null,
                                         embeds: [resultEmbed],
                                         components: []
                                     });
-                                } catch (error) {
-                                    console.error('Error reading or removing item:', error);
-                                    await i.editReply({
-                                        content: '❌ Nastala chyba při odebírání itemu.',
+                                }
+                            } else {
+                                // Odebrání položky z frakce
+                                // Získáme data položky z databáze
+                                let itemData = null;
+                                await new Promise((resolve) => {
+                                    db.get(
+                                        `SELECT purchases.*, shop_items.name, shop_items.type 
+                                         FROM purchases 
+                                         JOIN shop_items ON purchases.item_id = shop_items.id 
+                                         WHERE purchases.id = ?`,
+                                        [selectedItem],
+                                        (err, row) => {
+                                            if (!err && row) {
+                                                itemData = row;
+                                            }
+                                            resolve();
+                                        }
+                                    );
+                                });
+                                
+                                if (!itemData) {
+                                    return await i.editReply({
+                                        content: '❌ Položka nebyla nalezena v databázi.',
                                         components: []
                                     });
                                 }
+                                
+                                // Odstraníme položku z databáze
+                                await new Promise((resolve, reject) => {
+                                    db.run(
+                                        `DELETE FROM purchases WHERE id = ?`,
+                                        [selectedItem],
+                                        function(err) {
+                                            if (err) reject(err);
+                                            else resolve();
+                                        }
+                                    );
+                                });
+                                
+                                // Přidáme audit log
+                                addAuditLog(
+                                    interaction.user.id,
+                                    'remove_item',
+                                    'purchase',
+                                    selectedItem,
+                                    JSON.stringify({
+                                        fractionName: selectedFraction,
+                                        itemName: itemData.name,
+                                        count: itemData.count || 1
+                                    })
+                                );
+                                
+                                const resultEmbed = new EmbedBuilder()
+                                    .setColor(0xFF0000)
+                                    .setTitle('✅ Item odebrán')
+                                    .setDescription(`Item byl úspěšně odebrán z frakce ${selectedFraction}`)
+                                    .addFields(
+                                        { name: 'Item', value: itemData.name, inline: true },
+                                        { name: 'Sekce', value: selectedSection, inline: true }
+                                    );
+                                
+                                if (itemData.count && itemData.count > 1) {
+                                    resultEmbed.addFields({ 
+                                        name: 'Množství', 
+                                        value: `${itemData.count}x`, 
+                                        inline: true 
+                                    });
+                                }
+                                
+                                await i.editReply({
+                                    content: null,
+                                    embeds: [resultEmbed],
+                                    components: []
+                                });
                             }
                             collector.stop();
                         } catch (error) {

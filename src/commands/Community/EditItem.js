@@ -2,6 +2,7 @@ const { SlashCommandBuilder, ActionRowBuilder, StringSelectMenuBuilder, EmbedBui
 const { getEmoji } = require('../../utils/emojiUtils');
 const fs = require('fs');
 const path = require('path');
+const { db, getFractionByName, getFractionItems, updateFractionMoney, addAuditLog } = require('../../Database/database');
 
 // Helper function for logging
 const logEdit = (action, data) => {
@@ -126,23 +127,83 @@ module.exports = {
 
             // Check fraction membership
             const member = interaction.member;
-            const fractionRole = member.roles.cache.find(role => 
-                fs.existsSync(path.join(__dirname, '../../files/Fractions', role.name)));
-
+            
+            // Get user's fraction from database
+            let fractionRole = null;
+            let fractionData = null;
+            
+            const fractions = [];
+            await new Promise((resolve) => {
+                db.all(`SELECT name FROM fractions`, [], (err, rows) => {
+                    if (!err && rows) {
+                        rows.forEach(row => fractions.push(row.name));
+                    }
+                    resolve();
+                });
+            });
+            
+            fractionRole = member.roles.cache.find(role => fractions.includes(role.name));
+            
             if (!fractionRole) {
                 return await interaction.editReply({
                     content: `${getEmoji('error')} Nejste členem žádné frakce.`,
                     components: []
                 });
             }
-
-            const fractionPath = path.join(__dirname, '../../files/Fractions', fractionRole.name);
-            const fractionData = JSON.parse(fs.readFileSync(path.join(fractionPath, `${fractionRole.name}.json`)));
+            
+            // Get fraction data from database
+            await new Promise((resolve) => {
+                getFractionByName(fractionRole.name, (err, fraction) => {
+                    fractionData = fraction;
+                    resolve();
+                });
+            });
+            
+            if (!fractionData) {
+                return await interaction.editReply({
+                    content: `${getEmoji('error')} Nastala chyba při načítání dat frakce.`,
+                    components: []
+                });
+            }
 
             // Get all sections with items
-            const sections = fs.readdirSync(fractionPath, { withFileTypes: true })
-                .filter(dirent => dirent.isDirectory())
-                .map(dirent => dirent.name);
+            const sections = [];
+            const shopSections = [];
+            
+            // Get shop sections
+            await new Promise((resolve) => {
+                db.all(`SELECT name FROM shop_sections`, [], (err, rows) => {
+                    if (!err && rows) {
+                        rows.forEach(row => shopSections.push(row.name));
+                    }
+                    resolve();
+                });
+            });
+            
+            // Get fraction's purchased items by category
+            await new Promise((resolve) => {
+                getFractionItems(fractionRole.name, (err, items) => {
+                    if (!err && items) {
+                        // Group items by section
+                        const groupedItems = {};
+                        items.forEach(item => {
+                            // Determine section based on item type
+                            let section = 'Other';
+                            if (item.type === 'air_vehicle') section = 'Air vehicles';
+                            else if (item.type === 'ground_vehicle') section = 'Ground vehicles';
+                            else if (item.type === 'equipment') section = 'Equipment';
+                            else if (item.type === 'resource') section = 'Resources';
+                            
+                            if (!groupedItems[section]) {
+                                groupedItems[section] = [];
+                                sections.push(section);
+                            }
+                            groupedItems[section].push(item);
+                        });
+                    }
+                    resolve();
+                });
+            });
 
             if (sections.length === 0) {
                 return await interaction.editReply({
@@ -189,16 +250,31 @@ module.exports = {
 
                     if (i.customId === 'select-section') {
                         selectedSection = i.values[0];
-                        const sectionPath = path.join(fractionPath, selectedSection);
-                        const items = fs.readdirSync(sectionPath)
-                            .filter(file => file.endsWith('.json'))
-                            .map(file => {
-                                const itemData = JSON.parse(fs.readFileSync(path.join(sectionPath, file)));
-                                return {
-                                    label: `${itemData.name} (ID: ${itemData.id})`,
-                                    value: file
-                                };
+                        
+                        // Get items from the database for the selected section
+                        const items = [];
+                        await new Promise((resolve) => {
+                            getFractionItems(fractionRole.name, (err, allItems) => {
+                                if (!err && allItems) {
+                                    // Filter items by type to match section
+                                    allItems.forEach(item => {
+                                        let itemSection = 'Other';
+                                        if (item.type === 'air_vehicle') itemSection = 'Air vehicles';
+                                        else if (item.type === 'ground_vehicle') itemSection = 'Ground vehicles';
+                                        else if (item.type === 'equipment') itemSection = 'Equipment';
+                                        else if (item.type === 'resource') itemSection = 'Resources';
+                                        
+                                        if (itemSection === selectedSection) {
+                                            items.push({
+                                                label: `${item.name} (ID: ${item.id})`,
+                                                value: item.id.toString()
+                                            });
+                                        }
+                                    });
+                                }
+                                resolve();
                             });
+                        });
                     
                         const sectionMenuUpdated = new StringSelectMenuBuilder()
                             .setCustomId('select-section')
@@ -206,7 +282,7 @@ module.exports = {
                             .addOptions(sections.map(section => ({
                                 label: section,
                                 value: section,
-                                default: section === selectedSection  // Add this line
+                                default: section === selectedSection
                             })));
                     
                         const itemMenu = new StringSelectMenuBuilder()
@@ -224,12 +300,45 @@ module.exports = {
                     }
                     // Update the select-item handler
                     else if (i.customId === 'select-item') {
-                        const itemPath = path.join(fractionPath, selectedSection, i.values[0]);
-                        originalItem = JSON.parse(fs.readFileSync(itemPath));
-                        selectedItem = i.values[0];
-
-                        const shopItemPath = path.join(__dirname, '../../files/Shop', selectedSection, `${originalItem.name}.json`);
-                        const shopItem = JSON.parse(fs.readFileSync(shopItemPath));
+                        const itemId = i.values[0];
+                        
+                        // Get item data from database
+                        let selectedItemData = null;
+                        await new Promise((resolve) => {
+                            db.get(
+                                `SELECT purchases.*, shop_items.* 
+                                 FROM purchases 
+                                 JOIN shop_items ON purchases.item_id = shop_items.id 
+                                 WHERE purchases.id = ?`,
+                                [itemId],
+                                (err, row) => {
+                                    if (!err && row) {
+                                        selectedItemData = row;
+                                    }
+                                    resolve();
+                                }
+                            );
+                        });
+                        
+                        if (!selectedItemData) {
+                            return await i.editReply({
+                                content: `${getEmoji('error')} Předmět nebyl nalezen v databázi.`,
+                                components: []
+                            });
+                        }
+                        
+                        selectedItem = itemId;
+                        originalItem = {
+                            id: selectedItemData.id,
+                            name: selectedItemData.name,
+                            selectedMods: selectedItemData.selected_mods ? JSON.parse(selectedItemData.selected_mods) : []
+                        };
+                        
+                        // Get shop item details
+                        const shopItem = {
+                            name: selectedItemData.name,
+                            modifications: selectedItemData.modifications ? JSON.parse(selectedItemData.modifications) : {}
+                        };
 
                         selectedMods = JSON.parse(JSON.stringify(originalItem.selectedMods));
                         priceDifference = calculatePriceDifference(originalItem.selectedMods, selectedMods);
@@ -237,12 +346,29 @@ module.exports = {
                         const display = updateModificationDisplay(shopItem, selectedMods, priceDifference, 0);
                         await i.editReply(display);
                     }
-                    // Add page navigation handler
                     else if (i.customId === 'prev-page' || i.customId === 'next-page') {
                         currentPage += i.customId === 'next-page' ? 1 : -1;
                         
-                        const shopItemPath = path.join(__dirname, '../../files/Shop', selectedSection, `${originalItem.name}.json`);
-                        const shopItem = JSON.parse(fs.readFileSync(shopItemPath));
+                        // Get shop item details again from database
+                        let shopItem = null;
+                        await new Promise((resolve) => {
+                            db.get(
+                                `SELECT shop_items.* 
+                                 FROM purchases 
+                                 JOIN shop_items ON purchases.item_id = shop_items.id 
+                                 WHERE purchases.id = ?`,
+                                [selectedItem],
+                                (err, row) => {
+                                    if (!err && row) {
+                                        shopItem = {
+                                            name: row.name,
+                                            modifications: row.modifications ? JSON.parse(row.modifications) : {}
+                                        };
+                                    }
+                                    resolve();
+                                }
+                            );
+                        });
                         
                         const display = updateModificationDisplay(shopItem, selectedMods, priceDifference, currentPage);
                         await i.editReply(display);
@@ -339,21 +465,47 @@ module.exports = {
                             });
                         }
 
-                        // Update item file
-                        originalItem.selectedMods = selectedMods;
-                        fs.writeFileSync(
-                            path.join(fractionPath, selectedSection, selectedItem),
-                            JSON.stringify(originalItem, null, 2)
-                        );
-
-                        // Update fraction money
-                        if (priceDifference !== 0) {
-                            fractionData.money -= priceDifference;
-                            fs.writeFileSync(
-                                path.join(fractionPath, `${fractionRole.name}.json`),
-                                JSON.stringify(fractionData, null, 2)
+                        // Update item in database
+                        await new Promise((resolve) => {
+                            db.run(
+                                `UPDATE purchases SET selected_mods = ? WHERE id = ?`,
+                                [JSON.stringify(selectedMods), selectedItem],
+                                (err) => {
+                                    if (err) {
+                                        console.error('Error updating item:', err);
+                                    }
+                                    resolve();
+                                }
                             );
+                        });
+
+                        // Update fraction money if needed
+                        if (priceDifference !== 0) {
+                            try {
+                                await updateFractionMoney(fractionData.id, Math.abs(priceDifference), priceDifference < 0);
+                                
+                                // Update fractionData with new money amount
+                                fractionData.money = priceDifference > 0 
+                                    ? fractionData.money - priceDifference 
+                                    : fractionData.money + Math.abs(priceDifference);
+                            } catch (error) {
+                                console.error('Error updating fraction money:', error);
+                            }
                         }
+                        
+                        // Log the action
+                        addAuditLog(
+                            interaction.user.id,
+                            'edit_item',
+                            'purchase',
+                            selectedItem,
+                            JSON.stringify({
+                                fractionName: fractionRole.name,
+                                itemName: originalItem.name,
+                                priceDifference: priceDifference,
+                                modifications: selectedMods
+                            })
+                        );
 
                         // Send confirmation message
                         const confirmEmbed = new EmbedBuilder()
@@ -373,7 +525,26 @@ module.exports = {
                         });
                     }
                     else if (i.customId === 'sell-item') {
-                        const sellPrice = Math.floor(originalItem.totalPrice * 0.9);
+                        // Get item price from database
+                        let originalItemPrice = 0;
+                        await new Promise((resolve) => {
+                            db.get(
+                                `SELECT shop_items.price 
+                                 FROM purchases 
+                                 JOIN shop_items ON purchases.item_id = shop_items.id 
+                                 WHERE purchases.id = ?`,
+                                [selectedItem],
+                                (err, row) => {
+                                    if (!err && row) {
+                                        originalItemPrice = row.price;
+                                    }
+                                    resolve();
+                                }
+                            );
+                        });
+                        
+                        const sellPrice = Math.floor(originalItemPrice * 0.9);
+                        
                         const confirmSell = new EmbedBuilder()
                             .setColor(0xFF0000)
                             .setTitle(`${getEmoji('warning')} Potvrzení prodeje`)
@@ -397,30 +568,62 @@ module.exports = {
                         });
                     }
                     else if (i.customId === 'confirm-sell') {
-                        const sellPrice = Math.floor(originalItem.totalPrice * 0.9);
+                        // Get item price from database
+                        let originalItemPrice = 0;
+                        await new Promise((resolve) => {
+                            db.get(
+                                `SELECT shop_items.price 
+                                 FROM purchases 
+                                 JOIN shop_items ON purchases.item_id = shop_items.id 
+                                 WHERE purchases.id = ?`,
+                                [selectedItem],
+                                (err, row) => {
+                                    if (!err && row) {
+                                        originalItemPrice = row.price;
+                                    }
+                                    resolve();
+                                }
+                            );
+                        });
                         
+                        const sellPrice = Math.floor(originalItemPrice * 0.9);
+
+                        // Delete item from database
+                        await new Promise((resolve) => {
+                            db.run(
+                                `DELETE FROM purchases WHERE id = ?`,
+                                [selectedItem],
+                                (err) => {
+                                    if (err) {
+                                        console.error('Error deleting item:', err);
+                                    }
+                                    resolve();
+                                }
+                            );
+                        });
+
                         // Update fraction money
-                        fractionData.money += sellPrice;
-                        fs.writeFileSync(
-                            path.join(fractionPath, `${fractionRole.name}.json`),
-                            JSON.stringify(fractionData, null, 2)
-                        );
-
-                        // Delete item file
-                        fs.unlinkSync(path.join(fractionPath, selectedSection, selectedItem));
-
-                        // Check if section directory is empty and delete if it is
-                        const sectionPath = path.join(fractionPath, selectedSection);
-                        const remainingFiles = fs.readdirSync(sectionPath);
-                        if (remainingFiles.length === 0) {
-                            fs.rmdirSync(sectionPath);
-                            logEdit('Directory Removed', {
-                                section: selectedSection,
-                                path: sectionPath
-                            });
+                        try {
+                            await updateFractionMoney(fractionData.id, sellPrice, true); // Add money
+                            fractionData.money += sellPrice; // Update local copy
+                        } catch (error) {
+                            console.error('Error updating fraction money:', error);
                         }
 
-                        // Send confirmation
+                        // Log the action
+                        addAuditLog(
+                            interaction.user.id,
+                            'sell_item',
+                            'purchase',
+                            selectedItem,
+                            JSON.stringify({
+                                fractionName: fractionRole.name,
+                                itemName: originalItem.name,
+                                sellPrice: sellPrice
+                            })
+                        );
+
+                        // Send confirmation message
                         const sellEmbed = new EmbedBuilder()
                             .setColor(0x00FF00)
                             .setTitle(`${getEmoji('success')} Předmět prodán`)

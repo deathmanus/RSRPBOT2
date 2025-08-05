@@ -1,6 +1,7 @@
 const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const fs = require('fs');
 const path = require('path');
+const { db, getFractionByName, addAuditLog } = require('../../Database/database');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -22,16 +23,39 @@ module.exports = {
         try {
             // Check if user is in a fraction
             const member = interaction.member;
-            const fractionPath = path.join(__dirname, '../../files/Fractions');
-            const fractions = fs.readdirSync(fractionPath, { withFileTypes: true })
-                .filter(dirent => dirent.isDirectory())
-                .map(dirent => dirent.name);
+            
+            // Get all fractions from database
+            const fractions = [];
+            await new Promise((resolve) => {
+                db.all(`SELECT name FROM fractions`, [], (err, rows) => {
+                    if (!err && rows) {
+                        rows.forEach(row => fractions.push(row.name));
+                    }
+                    resolve();
+                });
+            });
 
             const userFraction = member.roles.cache.find(role => fractions.includes(role.name))?.name;
 
             if (!userFraction) {
                 return await interaction.reply({
                     content: '❌ Nejste členem žádné frakce.',
+                    ephemeral: true
+                });
+            }
+            
+            // Get fraction data from database
+            let fractionData;
+            await new Promise((resolve) => {
+                getFractionByName(userFraction, (err, fraction) => {
+                    fractionData = fraction;
+                    resolve();
+                });
+            });
+            
+            if (!fractionData) {
+                return await interaction.reply({
+                    content: '❌ Nastala chyba při načítání dat frakce.',
                     ephemeral: true
                 });
             }
@@ -50,9 +74,22 @@ module.exports = {
 
             const reason = interaction.options.getString('reason');
             
+            // Log the request to audit log
+            addAuditLog(
+                interaction.user.id,
+                'permission_request',
+                'fraction_role',
+                fractionData.id.toString(),
+                JSON.stringify({ 
+                    fractionName: userFraction,
+                    requestType,
+                    reason
+                })
+            );
+            
             // Create embed for the request
             const embed = new EmbedBuilder()
-                .setColor(0x0099FF)
+                .setColor(fractionData.color ? `#${fractionData.color}` : 0x0099FF)
                 .setTitle('📝 Žádost o oprávnění')
                 .setDescription(`${interaction.user} žádá o ${requestType === 'deputy' ? 'pozici zástupce' : 'oprávnění'}`)
                 .addFields(
@@ -66,11 +103,11 @@ module.exports = {
             const buttons = new ActionRowBuilder()
                 .addComponents(
                     new ButtonBuilder()
-                        .setCustomId(`perm-accept:${interaction.user.id}:${userFraction}:${requestType}`)
+                        .setCustomId(`perm-accept:${interaction.user.id}:${userFraction}:${requestType}:${fractionData.id}`)
                         .setLabel('Schválit')
                         .setStyle(ButtonStyle.Success),
                     new ButtonBuilder()
-                        .setCustomId(`perm-deny:${interaction.user.id}:${userFraction}:${requestType}`)
+                        .setCustomId(`perm-deny:${interaction.user.id}:${userFraction}:${requestType}:${fractionData.id}`)
                         .setLabel('Zamítnout')
                         .setStyle(ButtonStyle.Danger)
                 );
