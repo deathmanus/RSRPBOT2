@@ -1,0 +1,34 @@
+{
+  "id": "m7jk4prgs7qaq44tdo",
+  "name": "NH90 TTH",
+  "basePrice": 15100,
+  "selectedMods": [
+    {
+      "modName": "test",
+      "selected": "test:NATO green:0",
+      "subSelections": {}
+    },
+    {
+      "modName": "Camo",
+      "selected": "Camo:NATO green:0",
+      "subSelections": {}
+    },
+    {
+      "modName": "Config",
+      "selected": "Config:Armed:0",
+      "subSelections": {
+        "GunRight": {
+          "name": "No weapon",
+          "price": 0
+        },
+        "GunLeft": {
+          "name": "No weapon",
+          "price": 0
+        }
+      }
+    }
+  ],
+  "totalPrice": 15100,
+  "purchaseDate": "2025-02-24T21:15:56.140Z",
+  "buyer": "death_man"
+}
