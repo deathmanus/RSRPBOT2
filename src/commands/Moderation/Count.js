@@ -1,117 +1,114 @@
-﻿const { SlashCommandBuilder } = require('@discordjs/builders');
+﻿const { SlashCommandBuilder, EmbedBuilder } = require('@discordjs/builders');
+const { getCapturedPoints, getSSUStatus, getActiveFractionCaptures } = require('../../Database/database');
 
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('count')
         .setDescription('Na počítání basepointů'),
     async execute(interaction) {
-        let ListCapture = {};
-        let FinalEnd = null;
+        try {
+            await interaction.deferReply();
 
-        const channel = interaction.channel;
-        let messages = await channel.messages.fetch({ limit: 100 });
-
-        messages = [...messages.values()].sort((a, b) => a.createdTimestamp - b.createdTimestamp);
-
-        messages.forEach(message => {
-            let content = message.embeds[0]?.description || message.content;
-            let Capture = content.match(/\*\*(.+)\*\* obsadili basepoint \*\*(.+)\*\* v čase \*\*(.+)\*\*/);
-            let EndFinalTime = content.match(/Konec zabírání: \*\*(.+)\*\*/);
-
-            if (Capture) {
-                let [_, team, basepoint, time] = Capture;
-                let startTime = new Date(`1970-01-01T${time}Z`);
-
-                if (!ListCapture[basepoint]) {
-                    ListCapture[basepoint] = { teams: [], times: [] };
+            // Kontrola stavu SSU
+            getSSUStatus((err, ssuStatus) => {
+                if (err) {
+                    console.error('Error checking SSU status:', err);
+                    return interaction.editReply('❌ Nastala chyba při kontrole stavu SSU.');
                 }
 
-                ListCapture[basepoint].teams.push(team);
-                ListCapture[basepoint].times.push(startTime);
-            }
+                // Získání všech aktivních zabrání
+                getCapturedPoints((err, captures) => {
+                    if (err) {
+                        console.error('Error fetching captures:', err);
+                        return interaction.editReply('❌ Nastala chyba při načítání zabrání.');
+                    }
 
-            if (EndFinalTime) {
-                let endTime = new Date(`1970-01-01T${EndFinalTime[1]}Z`);
-                if (!isNaN(endTime)) {
-                    FinalEnd = endTime;
-                }
-            }
-        });
+                    // Získání statistik frakcí
+                    getActiveFractionCaptures((err, fractionStats) => {
+                        if (err) {
+                            console.error('Error fetching fraction stats:', err);
+                            return interaction.editReply('❌ Nastala chyba při načítání statistik.');
+                        }
 
-        function formatTime(milliseconds) {
-            let totalSeconds = Math.floor(milliseconds / 1000);
-            let hours = Math.floor(totalSeconds / 3600);
-            let minutes = Math.floor((totalSeconds % 3600) / 60);
+                        // Formátování data
+                        const now = new Date();
+                        const day = String(now.getDate()).padStart(2, '0');
+                        const month = String(now.getMonth() + 1).padStart(2, '0');
+                        const formattedDate = `${day}. ${month}.`;
 
-            return `${hours} hour(s) and ${minutes} min(s)`;
+                        // Vytvoření výstupu
+                        let output = `# Zabírání z ${formattedDate}\n\n`;
+
+                        if (!fractionStats || fractionStats.length === 0) {
+                            output += '**Žádné zabrané basepointy**\n';
+                        } else {
+                            // Seskupení zabrání podle basepointů
+                            const basepointGroups = {};
+                            
+                            captures.forEach(capture => {
+                                if (!basepointGroups[capture.basepoint_name]) {
+                                    basepointGroups[capture.basepoint_name] = [];
+                                }
+                                basepointGroups[capture.basepoint_name].push({
+                                    fraction: capture.fraction_name,
+                                    time: new Date(capture.captured_at)
+                                });
+                            });
+
+                            // Seřazení podle času pro každý basepoint a určení vítěze
+                            for (const basepoint in basepointGroups) {
+                                const captures = basepointGroups[basepoint].sort((a, b) => a.time - b.time);
+                                
+                                // Simulace counting logiky - určení, kdo drží basepoint nejdéle
+                                let currentHolder = null;
+                                let maxTime = 0;
+                                let lastChangeTime = null;
+                                
+                                const now = ssuStatus && ssuStatus.ended_at ? new Date(ssuStatus.ended_at) : new Date();
+                                
+                                captures.forEach((capture, index) => {
+                                    const startTime = capture.time;
+                                    const nextCaptureTime = index + 1 < captures.length 
+                                        ? captures[index + 1].time 
+                                        : now;
+                                    
+                                    const holdTime = nextCaptureTime - startTime;
+                                    
+                                    if (holdTime > maxTime) {
+                                        maxTime = holdTime;
+                                        currentHolder = capture.fraction;
+                                    }
+                                });
+
+                                output += `**${basepoint}:** ${currentHolder || 'Nikdo'}\n`;
+                            }
+                        }
+
+                        // Přidání informace o stavu SSU
+                        if (ssuStatus && ssuStatus.is_active) {
+                            output += "\n*SSU je aktivní - capturing probíhá*";
+                        } else if (ssuStatus && ssuStatus.ended_at) {
+                            const endTime = new Date(ssuStatus.ended_at);
+                            const timeString = new Intl.DateTimeFormat('en-GB', { 
+                                hour: '2-digit', 
+                                minute: '2-digit', 
+                                hour12: false, 
+                                timeZone: 'Etc/GMT-2' 
+                            }).format(endTime);
+                            output += `\n*Konec zabírání: ${timeString}*`;
+                        }
+
+                        output += "\n*Obsazuje se 45 minut po začátku SSU*";
+
+                        // Odeslání odpovědi
+                        interaction.editReply(output);
+                    });
+                });
+            });
+
+        } catch (error) {
+            console.error('Error in count command:', error);
+            await interaction.editReply('❌ Nastala chyba při zpracování příkazu.');
         }
-
-        let now = new Date();
-        let day = String(now.getDate()).padStart(2, '0');
-        let month = String(now.getMonth() + 1).padStart(2, '0'); // January is 0!
-        let formattedDate = `${day}. ${month}.`;
-
-        let output = `# Zabírání z ${formattedDate}\n\n`;
-
-        for (let basepoint in ListCapture) {
-            let teams = ListCapture[basepoint].teams;
-            let times = ListCapture[basepoint].times;
-
-            // Create an array of indices
-            let indices = Array.from({ length: times.length }, (_, i) => i);
-
-            // Sort the indices array by the corresponding times
-            indices.sort((a, b) => times[a] - times[b]);
-
-            // Create new arrays for teams and times
-            let sortedTeams = [];
-            let sortedTimes = [];
-
-            // Use the sorted indices to populate the new arrays
-            for (let i of indices) {
-                sortedTeams.push(teams[i]);
-                sortedTimes.push(times[i]);
-            }
-
-            // Replace the original arrays with the sorted arrays
-            ListCapture[basepoint].teams = sortedTeams;
-            ListCapture[basepoint].times = sortedTimes;
-
-            let ListTeam= {};
-            let maxTime = 0;
-            let maxTeam = '';
-
-            for (let j = 0; j < ListCapture[basepoint].teams.length; j++) {
-                if (!ListTeam[ListCapture[basepoint].teams[j]]) {
-                    ListTeam[ListCapture[basepoint].teams[j]] = {"TeamName": ListCapture[basepoint].teams[j], time: 0};
-                }
-                if(j + 1 < ListCapture[basepoint].times.length) {
-                    let time = ListCapture[basepoint].times[j].getTime();
-                    let timeEnd = ListCapture[basepoint].times[j + 1].getTime();
-                    let diff = timeEnd - time;
-                    ListTeam[ListCapture[basepoint].teams[j]].time += diff;
-                }
-                else {
-                    let time = ListCapture[basepoint].times[j].getTime();
-                    let timeEnd = FinalEnd.getTime();
-                    let diff = timeEnd - time;
-                    ListTeam[ListCapture[basepoint].teams[j]].time += diff;
-                }
-
-                // Check if the current team's time is greater than maxTime
-                if (ListTeam[ListCapture[basepoint].teams[j]].time > maxTime) {
-                    maxTime = ListTeam[ListCapture[basepoint].teams[j]].time;
-                    maxTeam = ListTeam[ListCapture[basepoint].teams[j]].TeamName;
-                }
-            }
-
-            // Append the basepoint and team with the most time to the output string
-            output += `**${basepoint}:** ${maxTeam}\n`;
-        }
-
-        output += "\n*Obsazuje se 45 minut po začátku SSU*";
-
-        // Send the output string as a single message
-        interaction.reply(output);
     }
 };

@@ -155,6 +155,64 @@ db.serialize(() => {
         declined_at TEXT,
         FOREIGN KEY(item_id) REFERENCES purchases(id)
     )`);
+
+    // Counting systém - zabrané basepointy
+    db.run(`CREATE TABLE IF NOT EXISTS captured_points (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        fraction_name TEXT,
+        basepoint_name TEXT,
+        captured_by TEXT,
+        captured_at TEXT,
+        image_url TEXT,
+        status TEXT DEFAULT 'active',
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    )`);
+
+    // Counting systém - SSU stav
+    db.run(`CREATE TABLE IF NOT EXISTS ssu_status (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        is_active INTEGER DEFAULT 0,
+        started_at TEXT,
+        ended_at TEXT,
+        started_by TEXT,
+        ended_by TEXT,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    )`);
+
+    // Povolené basepoint názvy
+    db.run(`CREATE TABLE IF NOT EXISTS basepoints (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT UNIQUE NOT NULL,
+        description TEXT,
+        added_by TEXT,
+        added_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        is_active INTEGER DEFAULT 1
+    )`);
+
+    // Inicializace základních basepointů (pokud tabulka je prázdná)
+    db.get(`SELECT COUNT(*) as count FROM basepoints`, [], (err, row) => {
+        if (!err && row && row.count === 0) {
+            console.log('Initializing default basepoints...');
+            const defaultBasepoints = [
+                { name: 'Armádní základna', description: 'Hlavní vojenská základna' },
+                { name: 'Policejní stanice', description: 'Centrální policejní stanice' },
+                { name: 'Nemocnice', description: 'Městská nemocnice' },
+                { name: 'Letiště', description: 'Městské letiště' },
+                { name: 'Přístav', description: 'Hlavní přístav města' },
+                { name: 'Továrna', description: 'Průmyslová továrna' },
+                { name: 'Radnice', description: 'Městská radnice' },
+                { name: 'Banka', description: 'Centrální banka' }
+            ];
+
+            defaultBasepoints.forEach(bp => {
+                db.run(
+                    `INSERT INTO basepoints (name, description, added_by) VALUES (?, ?, ?)`,
+                    [bp.name, bp.description, 'system']
+                );
+            });
+            console.log(`Initialized ${defaultBasepoints.length} default basepoints.`);
+        }
+    });
 });
 
 // --- Frakce ---
@@ -682,6 +740,174 @@ function updateTradeStatus(tradeId, status, userData) {
     });
 }
 
+// --- Capturing systém ---
+function addCapturedPoint(fractionName, basepointName, capturedBy, imageUrl) {
+    return new Promise((resolve, reject) => {
+        db.run(
+            `INSERT INTO captured_points (fraction_name, basepoint_name, captured_by, captured_at, image_url, status)
+             VALUES (?, ?, ?, ?, ?, 'active')`,
+            [fractionName, basepointName, capturedBy, new Date().toISOString(), imageUrl],
+            function(err) {
+                if (err) reject(err);
+                else resolve(this.lastID);
+            }
+        );
+    });
+}
+
+function removeCapturedPoint(captureId) {
+    return new Promise((resolve, reject) => {
+        db.run(
+            `UPDATE captured_points SET status = 'removed' WHERE id = ?`,
+            [captureId],
+            function(err) {
+                if (err) reject(err);
+                else resolve(this.changes > 0);
+            }
+        );
+    });
+}
+
+function getCapturedPoints(callback) {
+    db.all(
+        `SELECT * FROM captured_points WHERE status = 'active' ORDER BY captured_at DESC`,
+        [],
+        (err, rows) => {
+            callback(err, rows);
+        }
+    );
+}
+
+function getActiveCapturedPoints(fractionName, callback) {
+    const query = fractionName 
+        ? `SELECT * FROM captured_points WHERE fraction_name = ? AND status = 'active' ORDER BY captured_at DESC`
+        : `SELECT * FROM captured_points WHERE status = 'active' ORDER BY captured_at DESC`;
+    const params = fractionName ? [fractionName] : [];
+    
+    db.all(query, params, (err, rows) => {
+        callback(err, rows);
+    });
+}
+
+function setSSUStatus(isActive, userId) {
+    return new Promise((resolve, reject) => {
+        if (isActive) {
+            db.run(
+                `INSERT INTO ssu_status (is_active, started_at, started_by) VALUES (1, ?, ?)`,
+                [new Date().toISOString(), userId],
+                function(err) {
+                    if (err) reject(err);
+                    else resolve(this.lastID);
+                }
+            );
+        } else {
+            db.run(
+                `UPDATE ssu_status SET is_active = 0, ended_at = ?, ended_by = ? 
+                 WHERE is_active = 1`,
+                [new Date().toISOString(), userId],
+                function(err) {
+                    if (err) reject(err);
+                    else resolve(this.changes > 0);
+                }
+            );
+        }
+    });
+}
+
+function getSSUStatus(callback) {
+    db.get(
+        `SELECT * FROM ssu_status WHERE is_active = 1 ORDER BY started_at DESC LIMIT 1`,
+        [],
+        (err, row) => {
+            callback(err, row);
+        }
+    );
+}
+
+function getActiveFractionCaptures(callback) {
+    db.all(
+        `SELECT fraction_name, COUNT(*) as capture_count 
+         FROM captured_points 
+         WHERE status = 'active' 
+         GROUP BY fraction_name 
+         ORDER BY capture_count DESC`,
+        [],
+        (err, rows) => {
+            callback(err, rows);
+        }
+    );
+}
+
+// --- Basepoints správa ---
+function addBasepoint(name, description, addedBy) {
+    return new Promise((resolve, reject) => {
+        db.run(
+            `INSERT INTO basepoints (name, description, added_by) VALUES (?, ?, ?)`,
+            [name, description || null, addedBy],
+            function(err) {
+                if (err) reject(err);
+                else resolve(this.lastID);
+            }
+        );
+    });
+}
+
+function removeBasepoint(basepointId) {
+    return new Promise((resolve, reject) => {
+        db.run(
+            `UPDATE basepoints SET is_active = 0 WHERE id = ?`,
+            [basepointId],
+            function(err) {
+                if (err) reject(err);
+                else resolve(this.changes > 0);
+            }
+        );
+    });
+}
+
+function getActiveBasepoints(callback) {
+    db.all(
+        `SELECT * FROM basepoints WHERE is_active = 1 ORDER BY name ASC`,
+        [],
+        (err, rows) => {
+            callback(err, rows);
+        }
+    );
+}
+
+function getAllBasepoints(callback) {
+    db.all(
+        `SELECT * FROM basepoints ORDER BY is_active DESC, name ASC`,
+        [],
+        (err, rows) => {
+            callback(err, rows);
+        }
+    );
+}
+
+function getBasepointByName(name, callback) {
+    db.get(
+        `SELECT * FROM basepoints WHERE name = ? AND is_active = 1`,
+        [name],
+        (err, row) => {
+            callback(err, row);
+        }
+    );
+}
+
+function updateBasepoint(basepointId, name, description) {
+    return new Promise((resolve, reject) => {
+        db.run(
+            `UPDATE basepoints SET name = ?, description = ? WHERE id = ?`,
+            [name, description || null, basepointId],
+            function(err) {
+                if (err) reject(err);
+                else resolve(this.changes > 0);
+            }
+        );
+    });
+}
+
 // Export všech funkcí
 module.exports = {
     db,
@@ -727,5 +953,20 @@ module.exports = {
     updateTradeStatus,
     // Shop logy
     addShopLog,
-    getShopLogs
+    getShopLogs,
+    // Capturing systém
+    addCapturedPoint,
+    removeCapturedPoint,
+    getCapturedPoints,
+    getActiveCapturedPoints,
+    setSSUStatus,
+    getSSUStatus,
+    getActiveFractionCaptures,
+    // Basepoints správa
+    addBasepoint,
+    removeBasepoint,
+    getActiveBasepoints,
+    getAllBasepoints,
+    getBasepointByName,
+    updateBasepoint
 };

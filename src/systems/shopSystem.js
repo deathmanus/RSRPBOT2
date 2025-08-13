@@ -134,53 +134,12 @@ class ShopSystem {
                     resolve(itemsFormatted);
                 });
             });
-        try {
-            // Načtení položek z databáze
-            const items = await new Promise((resolve, reject) => {
-                getShopItems(sectionName, (err, rows) => {
-                    if (err) {
-                        reject(err);
-                        return;
-                    }
-                    
-                    // Zpracování dat z databáze
-                    const itemsFormatted = rows.map(item => {
-                        // Parse modifications JSON if it exists
-                        let modifications = null;
-                        if (item.modifications) {
-                            try {
-                                modifications = JSON.parse(item.modifications);
-                            } catch (e) {
-                                ShopLogger.log('Error', {
-                                    action: 'parseModifications',
-                                    itemId: item.id,
-                                    error: e.message
-                                });
-                            }
-                        }
-                        
-                        return {
-                            id: item.id,
-                            name: item.name,
-                            type: item.type,
-                            basePrice: item.base_price,
-                            maxCount: item.max_count,
-                            minCount: item.min_count,
-                            modifications: modifications,
-                            description: item.description,
-                            filename: `${item.id}.json` // Pro kompatibilitu se starým kódem
-                        };
-                    });
-                    
-                    resolve(itemsFormatted);
-                });
-            });
 
             // Aktualizace cache
             shopCache.sections[sectionName] = items;
             shopCache.lastUpdate = now;
             
-            ShopLogger.log('Section Loaded (DB)', { 
+            
             ShopLogger.log('Section Loaded (DB)', { 
                 section: sectionName, 
                 itemCount: items.length 
@@ -196,6 +155,7 @@ class ShopSystem {
             throw error;
         }
     }
+
 
     static validateItem(item) {
         const errors = [];

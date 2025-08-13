@@ -153,7 +153,7 @@ module.exports = {
                                         maxCount: row.max_count,
                                         minCount: row.min_count,
                                         modifications: modifications,
-                                        description: row.description
+                                        description: (row.description && row.description.length > 0) ? row.description : ' '
                                     });
                                 }
                             );
@@ -175,7 +175,7 @@ module.exports = {
 
                         switch (itemData.type) {
                             case 'countable':
-                                const countDisplay = createCountableDisplay(itemData);
+                                const countDisplay = await createCountableDisplay(itemData, 1, selectedSection);
                                 await i.editReply({
                                     embeds: [countDisplay.embed],
                                     components: countDisplay.components
@@ -207,7 +207,7 @@ module.exports = {
                                 collector.pages = pages;
                                 collector.currentPage = 0;
                                 
-                                const display = updateModificationDisplay(i, itemData, selectedMods, 0);
+                                const display = await updateModificationDisplay(i, itemData, selectedMods, 0);
                                 await i.editReply(display);
                                 itemState = { type: 'modifiable', selectedMods };
                                 break;
@@ -287,7 +287,7 @@ module.exports = {
                             });
                         }
                     
-                        const display = updateModificationDisplay(i, itemData, selectedMods, collector.currentPage || 0);
+                        const display = await updateModificationDisplay(i, itemData, selectedMods, collector.currentPage || 0);
                         await i.editReply(display);
                     }
                     else if (i.customId.startsWith('select-submod-')) {
@@ -403,7 +403,7 @@ module.exports = {
                             updatedMod: selectedMods[modIndex]
                         });
                     
-                        const display = updateModificationDisplay(i, itemData, selectedMods, collector.currentPage || 0);
+                        const display = await updateModificationDisplay(i, itemData, selectedMods, collector.currentPage || 0);
                         await i.editReply(display);
                     }
                     else if (i.customId === 'prev-page' || i.customId === 'next-page') {
@@ -456,7 +456,7 @@ module.exports = {
                         // Update current page with bounds checking
                         collector.currentPage = Math.max(0, Math.min(pages.length - 1, (collector.currentPage || 0) + direction));
                     
-                        const display = updateModificationDisplay(i, itemData, selectedMods, collector.currentPage);
+                        const display = await updateModificationDisplay(i, itemData, selectedMods, collector.currentPage);
                         await i.editReply(display);
                     }
                     else if (i.customId === 'select-count') {
@@ -493,8 +493,7 @@ module.exports = {
                         });
                         
                         itemState.selectedCount = count;
-                        const countDisplay = createCountableDisplay(itemData, count);
-                        
+                        const countDisplay = await createCountableDisplay(itemData, count, selectedSection);
                         await i.editReply({
                             embeds: [countDisplay.embed],
                             components: countDisplay.components
@@ -651,14 +650,14 @@ module.exports = {
                             // Vytvoření potvrzovacího embedu
                             const confirmEmbed = new EmbedBuilder()
                                 .setColor(0xFFAA00)
-                                .setTitle(`${getEmoji('store')} Potvrzení nákupu`)
+                                .setTitle(`${await getEmoji('store')} Potvrzení nákupu`)
                                 .setDescription(`**Opravdu chcete koupit tento předmět?**`)
                                 .addFields(
                                     { name: 'Položka', value: name, inline: true },
                                     { name: 'Sekce', value: selectedSection, inline: true },
-                                    { name: 'Celková cena', value: `${totalPrice} ${getEmoji('money')}`, inline: true },
+                                    { name: 'Celková cena', value: `${totalPrice} ${await getEmoji('money')}`, inline: true },
                                     { name: 'Vybrané možnosti', value: selectedOptions.length > 0 ? selectedOptions.join('\n') : 'Žádné možnosti' },
-                                    { name: 'Stav účtu frakce', value: `Současný: ${fractionData.money}${getEmoji('money')}\nPo nákupu: ${fractionData.money - totalPrice}${getEmoji('money')}` }
+                                    { name: 'Stav účtu frakce', value: `Současný: ${fractionData.money}${await getEmoji('money')}\nPo nákupu: ${fractionData.money - totalPrice}${await getEmoji('money')}` }
                                 );
                     
                             const confirmRow = new ActionRowBuilder()
@@ -839,12 +838,12 @@ module.exports = {
                                                 // Create purchase confirmation embed with updated information
                                                 const purchaseEmbed = new EmbedBuilder()
                                                     .setColor(0x00FF00)
-                                                    .setTitle(`${getEmoji('success')} Nákup dokončen`)
+                                                    .setTitle(`${await getEmoji('success')} Nákup dokončen`)
                                                     .setDescription(`**${interaction.user.tag}** zakoupil/a pro frakci **${fractionRole.name}**:`)
                                                     .addFields(
                                                         { name: 'Položka', value: name, inline: true },
                                                         { name: 'Sekce', value: selectedSection, inline: true },
-                                                        { name: 'Celková cena', value: `${totalPrice} ${getEmoji('money')}`, inline: true }
+                                                        { name: 'Celková cena', value: `${totalPrice} ${await getEmoji('money')}`, inline: true }
                                                     );
                                 
                                                 // Add type-specific fields
@@ -860,7 +859,7 @@ module.exports = {
                                                 }
                                 
                                                 purchaseEmbed.addFields(
-                                                    { name: 'Nový stav účtu', value: `${fractionData.money} ${getEmoji('money')}` },
+                                                    { name: 'Nový stav účtu', value: `${fractionData.money} ${await getEmoji('money')}` },
                                                     { name: 'ID předmětu', value: purchaseData.id }
                                                 ).setTimestamp();
                                 
@@ -1142,11 +1141,11 @@ function calculateTotalPrice(basePrice, selectedMods) {
     return total;
 }
 
-function createItemEmbed(name, basePrice, totalPrice, selectedMods) {
+async function createItemEmbed(name, basePrice, totalPrice, selectedMods) {
     return new EmbedBuilder()
         .setColor(0x00FF00)
-        .setTitle(`${getEmoji('store')} ${name}`)
-        .setDescription(`Základní cena: ${basePrice} ${getEmoji('money')}`)
+        .setTitle(`${await getEmoji('store')} ${name}`)
+        .setDescription(`Základní cena: ${basePrice} ${await getEmoji('money')}`)
         .addFields(selectedMods.map(mod => ({
             name: mod.modName,
             value: `${mod.selected.split(':')[1]}${
@@ -1156,7 +1155,7 @@ function createItemEmbed(name, basePrice, totalPrice, selectedMods) {
             }`,
             inline: true
         })))
-        .addFields({ name: 'Celková cena', value: `${totalPrice} ${getEmoji('money')}`, inline: true });
+        .addFields({ name: 'Celková cena', value: `${totalPrice} ${await getEmoji('money')}`, inline: true });
 }
 
 function createModificationRows(modifications, selectedMods) {
@@ -1287,7 +1286,7 @@ function createModificationPages(modifications, selectedMods) {
 }
 
 // Update the updateModificationDisplay function
-function updateModificationDisplay(interaction, itemData, selectedMods, currentPage = 0) {
+async function updateModificationDisplay(interaction, itemData, selectedMods, currentPage = 0) {
     const { pages, totalModifications } = createModificationPages(itemData.modifications, selectedMods);
     const { name, basePrice } = itemData;
 
@@ -1336,7 +1335,7 @@ function updateModificationDisplay(interaction, itemData, selectedMods, currentP
     }
 
     const totalPrice = calculateTotalPrice(basePrice, selectedMods);
-    const itemEmbed = createItemEmbed(name, basePrice, totalPrice, selectedMods);
+    const itemEmbed = await createItemEmbed(name, basePrice, totalPrice, selectedMods);
     
     if (pages.length > 1) {
         itemEmbed.setFooter({ text: `Stránka ${currentPage + 1}/${pages.length}` });
@@ -1349,7 +1348,7 @@ function updateModificationDisplay(interaction, itemData, selectedMods, currentP
 }
 
 // First, add item type check helpers
-function createCountableDisplay(itemData, count = 1) {
+async function createCountableDisplay(itemData, count = 1, selectedSection = '') {
     const { name, basePrice, description, maxCount = 25, minCount = 1 } = itemData;
     const totalPrice = basePrice * count;
     
@@ -1357,6 +1356,12 @@ function createCountableDisplay(itemData, count = 1) {
     const startCount = Math.max(minCount, 1);
     const maxOptions = 25; // Maximum number of options to show in dropdown
     const endCount = Math.min(maxCount, startCount + maxOptions - 1);
+
+    const moneyEmoji = await getEmoji('money');
+    const storeEmoji = await getEmoji('store');
+
+    // Check if this is Equipment section to hide price from dropdown
+    const isEquipment = selectedSection === 'Equipment';
 
     const countMenu = new ActionRowBuilder().addComponents(
         new StringSelectMenuBuilder()
@@ -1367,7 +1372,7 @@ function createCountableDisplay(itemData, count = 1) {
                     { length: endCount - startCount + 1 }, 
                     (_, i) => i + startCount
                 ).map(num => ({
-                    label: `${num}x (${num * basePrice}${getEmoji('money')})`,
+                    label: isEquipment ? `${num}x` : `${num}x (${num * basePrice}${moneyEmoji})`,
                     value: num.toString(),
                     default: num === count
                 }))
@@ -1376,12 +1381,12 @@ function createCountableDisplay(itemData, count = 1) {
 
     const embed = new EmbedBuilder()
         .setColor(0x00FF00)
-        .setTitle(`${getEmoji('store')} ${name}`)
-        .setDescription(description || '')
+        .setTitle(`${storeEmoji} ${name}`)
+        .setDescription((description && description.length > 0) ? description : ' ')
         .addFields(
-            { name: 'Cena za kus', value: `${basePrice} ${getEmoji('money')}`, inline: true },
+            { name: 'Cena za kus', value: `${basePrice} ${moneyEmoji}`, inline: true },
             { name: 'Množství', value: count.toString(), inline: true },
-            { name: 'Celková cena', value: `${totalPrice} ${getEmoji('money')}`, inline: true },
+            { name: 'Celková cena', value: `${totalPrice} ${moneyEmoji}`, inline: true },
             { 
                 name: 'Limity', 
                 value: `Minimum: ${minCount} ks\nMaximum: ${maxCount} ks`, 

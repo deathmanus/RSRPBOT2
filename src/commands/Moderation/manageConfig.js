@@ -18,7 +18,8 @@ module.exports = {
                         .addChoices(
                             { name: 'Shop', value: 'shop' },
                             { name: 'Income', value: 'income' },
-                            { name: 'Fractions', value: 'fractions' }
+                            { name: 'Fractions', value: 'fractions' },
+                            { name: 'Emojis', value: 'emojis' }
                         )))
         .addSubcommand(subcommand =>
             subcommand
@@ -31,15 +32,16 @@ module.exports = {
                         .addChoices(
                             { name: 'Shop', value: 'shop' },
                             { name: 'Income', value: 'income' },
-                            { name: 'Fractions', value: 'fractions' }
+                            { name: 'Fractions', value: 'fractions' },
+                            { name: 'Emojis', value: 'emojis' }
                         ))
                 .addStringOption(option =>
                     option.setName('key')
-                        .setDescription('Klíč nastavení (např. paymentTime)')
+                        .setDescription('Klíč nastavení (např. paymentTime nebo money)')
                         .setRequired(true))
                 .addStringOption(option =>
                     option.setName('value')
-                        .setDescription('Nová hodnota')
+                        .setDescription('Nová hodnota (pro emojis např. "💰")')
                         .setRequired(true)))
         .addSubcommand(subcommand =>
             subcommand

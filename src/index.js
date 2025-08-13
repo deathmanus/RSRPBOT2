@@ -9,6 +9,7 @@ const client = new Client({
     ] 
 });
 const IncomeSystem = require('./systems/incomeSystem');
+const CaptureRewardSystem = require('./systems/captureRewardSystem');
 
 
 client.commands = new Collection();
@@ -49,6 +50,8 @@ const logChannelId = '1213225816201240587';
 
     client.once('ready', () => {
         const incomeSystem = new IncomeSystem(client);
+        const captureRewardSystem = new CaptureRewardSystem(client);
+        captureRewardSystem.start();
     });
     
 
